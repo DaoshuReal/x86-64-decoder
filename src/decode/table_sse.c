@@ -31,6 +31,7 @@ static void apply_variant(X86decEntry* out, const X86decSseVariant* picked)
   out->shapes[0] = picked->shapes[0];
   out->shapes[1] = picked->shapes[1];
   out->shapes[2] = picked->shapes[2];
+  out->shapes[3] = picked->shapes[3];
   out->mem_bits = picked->mem_bits;
 }
 
@@ -155,6 +156,32 @@ enum x86dec_status_e x86dec_resolve_sse(uint8_t opcode, uint8_t modrm,
 
   if (opcode == 0x6E || opcode == 0x7E) {
     return resolve_movdq(opcode, fx, out);
+  }
+
+  if (opcode == 0xC4 || opcode == 0xC5) {
+    int use_xmm = (fx & X86DEC_FX_66) != 0;
+    if (fx & (X86DEC_FX_F3 | X86DEC_FX_F2)) {
+      return X86DEC_INVALID;
+    }
+    if (opcode == 0xC4) {
+      out->mnemonic = M(PINSRW);
+      out->count = 3;
+      out->shapes[0] = use_xmm ? S(XMM_REG) : S(MM_REG);
+      out->shapes[1] = S(R32_OR_MEM16);
+      out->shapes[2] = S(IMM8);
+      out->mem_bits = 0;
+      return X86DEC_OK;
+    }
+    out->mnemonic = M(PEXTRW);
+    out->count = 3;
+    out->shapes[0] = S(R32_REG);
+    out->shapes[1] = use_xmm ? S(XMM_RM) : S(MM_RM);
+    out->shapes[2] = S(IMM8);
+    out->mem_bits = 0;
+    if (((modrm >> 6) & 3) != 3) {
+      return X86DEC_INVALID;
+    }
+    return X86DEC_OK;
   }
 
   if (!has_row(row)) {

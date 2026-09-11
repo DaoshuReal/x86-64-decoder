@@ -47,7 +47,7 @@ file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
 add_executable(x86dec ${SOURCES} ${HEADERS})
 
 if(X86DEC_UNITY_BUILD)
-  set_target_properties(x86dec PROPERTIES UNITY_BUILD ON)
+  set_target_properties(x86dec PROPERTIES UNITY_BUILD ON UNITY_BUILD_BATCH_SIZE 50)
 endif()
 
 target_include_directories(x86dec PRIVATE
@@ -55,7 +55,7 @@ target_include_directories(x86dec PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_compile_options(x86dec PRIVATE
-  /std:c17 /EHa /O2 /DNDEBUG
+  /std:c17 /EHa /O2 /Ot /Oi /DNDEBUG
   /DWIN32_LEAN_AND_MEAN
   /DCOBJMACROS
   /D_CRT_SECURE_NO_WARNINGS
@@ -64,4 +64,33 @@ target_compile_options(x86dec PRIVATE
 target_link_options(x86dec PRIVATE /SUBSYSTEM:CONSOLE)
 
 target_link_libraries(x86dec PRIVATE
+  kernel32)
+
+file(GLOB_RECURSE BENCH_LIB_SOURCES CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
+list(REMOVE_ITEM BENCH_LIB_SOURCES
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/main.c")
+
+add_executable(x86dec-bench-zydis
+  bench/bench_zydis.c
+  vendor/zydis/Zydis.c
+  ${BENCH_LIB_SOURCES})
+
+set_target_properties(x86dec-bench-zydis PROPERTIES UNITY_BUILD OFF)
+
+target_include_directories(x86dec-bench-zydis PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/x86dec
+  ${CMAKE_CURRENT_SOURCE_DIR}/src
+  ${CMAKE_CURRENT_SOURCE_DIR}/vendor/zydis)
+
+target_compile_options(x86dec-bench-zydis PRIVATE
+  /std:c17 /EHa /O2 /Ot /Oi /DNDEBUG
+  /DWIN32_LEAN_AND_MEAN
+  /DCOBJMACROS
+  /D_CRT_SECURE_NO_WARNINGS
+  /D_WINSOCK_DEPRECATED_NO_WARNINGS)
+
+target_link_options(x86dec-bench-zydis PRIVATE /SUBSYSTEM:CONSOLE)
+
+target_link_libraries(x86dec-bench-zydis PRIVATE
   kernel32)

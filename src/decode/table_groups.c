@@ -98,7 +98,7 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
     }
 
     if (opcode == 0x24 || opcode == 0x26) {
-      return X86DEC_UNSUPPORTED;
+      return X86DEC_INVALID;
     }
 
     return x86dec_resolve_sse(opcode, modrm, fx, out);
@@ -251,7 +251,7 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
             out->mnemonic =
                 (fx & X86DEC_FX_REXW) ? M(RDSSPQ) : M(RDSSPD);
             out->count = 1;
-            out->shapes[0] = S(GPR_REG);
+            out->shapes[0] = S(GPR_RM);
           } else {
             return X86DEC_INVALID;
           }
@@ -431,6 +431,9 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
               out->count = 1;
               out->shapes[0] = S(IMPLICIT_GPR);
               break;
+            case 0xD9:
+              out->mnemonic = M(VMMCALL);
+              break;
             case 0xDA:
               out->mnemonic = M(VMLOAD);
               out->count = 1;
@@ -440,6 +443,9 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
               out->mnemonic = M(VMSAVE);
               out->count = 1;
               out->shapes[0] = S(IMPLICIT_GPR);
+              break;
+            case 0xDC:
+              out->mnemonic = M(STGI);
               break;
             case 0xDD:
               out->mnemonic = M(CLGI);
@@ -740,6 +746,7 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
         case S(XMM32):
         case S(XMM64):
         case S(MM32):
+        case S(MM_RM):
           if (mod != 3) {
             return X86DEC_INVALID;
           }

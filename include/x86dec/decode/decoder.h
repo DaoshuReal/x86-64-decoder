@@ -81,26 +81,36 @@ typedef struct {
   uint8_t imm_size;
   uint16_t mnemonic;
   uint8_t count;
-  uint8_t shapes[3];
-  uint8_t fixed[3];
+  uint8_t shapes[4];
+  uint8_t fixed[4];
   uint8_t length;
   uint8_t opcode;
   uint8_t map;
   uint16_t flags;
   uint16_t mem_bits;
+  uint8_t is_vex;
+  uint8_t vex_l;
+  uint8_t vex_w;
+  uint8_t vex_vvvv;
+  uint8_t vex_r;
+  uint8_t vex_x;
+  uint8_t vex_b;
+  uint8_t vex_pp;
+  uint8_t vex_map;
+  uint8_t vex_opcode;
 } X86decContext;
 
 bool x86dec_decoder_init(X86decDecoder* decoder,
     enum x86dec_machine_mode_e mode, enum x86dec_stack_width_e width);
 
-enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
-    X86decContext* context, const void* buffer, size_t length,
-    X86decInsn* insn);
+enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* restrict decoder,
+    X86decContext* restrict context, const void* restrict buffer, size_t length,
+    X86decInsn* restrict insn);
 
-enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* decoder,
-    const X86decContext* context, const X86decInsn* insn,
-    X86decOperand* operands, uint8_t operand_count);
+enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* restrict decoder,
+    const X86decContext* restrict context, const X86decInsn* restrict insn,
+    X86decOperand* restrict operands, uint8_t operand_count);
 
-enum x86dec_status_e x86dec_decode_full(const X86decDecoder* decoder,
-    const void* buffer, size_t length, X86decInsn* insn,
-    X86decOperand* operands, uint8_t operand_count);
+enum x86dec_status_e x86dec_decode_full(const X86decDecoder* restrict decoder,
+    const void* restrict buffer, size_t length, X86decInsn* restrict insn,
+    X86decOperand* restrict operands, uint8_t operand_count);

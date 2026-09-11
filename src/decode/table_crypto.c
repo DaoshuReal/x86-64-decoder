@@ -31,6 +31,7 @@ static enum x86dec_status_e pick_0f38(const X86decSseEntry* e, uint16_t fx,
   out->shapes[0] = v->shapes[0];
   out->shapes[1] = v->shapes[1];
   out->shapes[2] = v->shapes[2];
+  out->shapes[3] = v->shapes[3];
   out->mem_bits = v->mem_bits;
 
   return X86DEC_OK;
@@ -54,8 +55,8 @@ static void crypto_fill_xmm_imm(X86decEntry* out, uint16_t mnemonic)
   out->shapes[2] = S(IMM8);
 }
 
-static enum x86dec_status_e resolve_38(uint8_t opcode, uint16_t fx,
-    X86decEntry* out)
+static enum x86dec_status_e resolve_38(uint8_t opcode, uint8_t modrm,
+    uint16_t fx, X86decEntry* out)
 {
   int has_66 = (fx & X86DEC_FX_66) != 0;
   int has_simd_prefix = (fx & (X86DEC_FX_F3 | X86DEC_FX_F2)) != 0;
@@ -87,7 +88,6 @@ static enum x86dec_status_e resolve_38(uint8_t opcode, uint16_t fx,
     case 0xCB:
     case 0xCC:
     case 0xCD:
-    case 0xCE:
       if (has_66 || has_simd_prefix) {
         return X86DEC_INVALID;
       }
@@ -104,6 +104,33 @@ static enum x86dec_status_e resolve_38(uint8_t opcode, uint16_t fx,
       } else {
         crypto_fill_xmm(out, M(SHA256MSG2));
       }
+      return X86DEC_OK;
+    case 0xF0:
+    case 0xF1:
+      if (has_simd_prefix) {
+        if (!(fx & X86DEC_FX_F2) || has_66) {
+          return X86DEC_INVALID;
+        }
+        out->mnemonic = M(CRC32);
+        out->count = 2;
+        out->shapes[0] = S(GPR_REG);
+        out->shapes[1] = opcode == 0xF0 ? S(GPR8_OR_MEM) : S(GPR_OR_MEM);
+        out->shapes[2] = S(NONE);
+        return X86DEC_OK;
+      }
+      if (((modrm >> 6) & 3) == 3) {
+        return X86DEC_INVALID;
+      }
+      out->mnemonic = M(MOVBE);
+      out->count = 2;
+      if (opcode == 0xF0) {
+        out->shapes[0] = S(GPR_REG);
+        out->shapes[1] = S(MEM_RM);
+      } else {
+        out->shapes[0] = S(MEM_RM);
+        out->shapes[1] = S(GPR_REG);
+      }
+      out->shapes[2] = S(NONE);
       return X86DEC_OK;
     case 0x00:
     case 0x01:
@@ -181,17 +208,6 @@ static enum x86dec_status_e resolve_38(uint8_t opcode, uint16_t fx,
       out->shapes[1] = S(GPR_REG);
       out->shapes[2] = S(NONE);
       return X86DEC_OK;
-    case 0xF0:
-    case 0xF1:
-      if (!(fx & X86DEC_FX_F2) || has_66) {
-        return X86DEC_INVALID;
-      }
-      out->mnemonic = M(CRC32);
-      out->count = 2;
-      out->shapes[0] = S(GPR_REG);
-      out->shapes[1] = opcode == 0xF0 ? S(GPR8_OR_MEM) : S(GPR_OR_MEM);
-      out->shapes[2] = S(NONE);
-      return X86DEC_OK;
     default:
       return X86DEC_UNSUPPORTED;
   }
@@ -255,7 +271,7 @@ static enum x86dec_status_e resolve_3a(uint8_t opcode, uint16_t fx,
 enum x86dec_status_e x86dec_resolve_crypto(uint8_t map, uint8_t opcode,
     uint8_t modrm, uint16_t fx, X86decEntry* out)
 {
-  (void)modrm;
+  enum x86dec_status_e st;
 
   if (map == 2) {
     const X86decSseEntry* e = &x86dec_0f38[opcode];
@@ -264,14 +280,26 @@ enum x86dec_status_e x86dec_resolve_crypto(uint8_t map, uint8_t opcode,
       return pick_0f38(e, fx, out);
     }
 
-    return resolve_38(opcode, fx, out);
+    return resolve_38(opcode, modrm, fx, out);
   }
 
   if (map == 3) {
     const X86decSseEntry* e = &x86dec_0f3a[opcode];
 
     if (has_0f38_row(e)) {
-      return pick_0f38(e, fx, out);
+      st = pick_0f38(e, fx, out);
+      if (st != X86DEC_OK) {
+        return st;
+      }
+      if (opcode == 0x16 && (fx & X86DEC_FX_REXW)) {
+        out->mnemonic = M(PEXTRQ);
+        out->shapes[0] = S(GPR_OR_MEM);
+      }
+      if (opcode == 0x22 && (fx & X86DEC_FX_REXW)) {
+        out->mnemonic = M(PINSRQ);
+        out->shapes[1] = S(GPR_OR_MEM);
+      }
+      return X86DEC_OK;
     }
 
     return resolve_3a(opcode, fx, out);

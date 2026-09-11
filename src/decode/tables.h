@@ -55,16 +55,36 @@ enum x86dec_shape_e {
   X86DEC_SHAPE_IMPLICIT_GPR,
   X86DEC_SHAPE_IMPLICIT_GPR32,
   X86DEC_SHAPE_IMPLICIT_ST0,
-  X86DEC_SHAPE_GPR_OR_MEM16
+  X86DEC_SHAPE_GPR_OR_MEM16,
+  X86DEC_SHAPE_IMPLICIT_XMM0,
+  X86DEC_SHAPE_MM_RM,
+  X86DEC_SHAPE_R32_OR_MEM16,
+  X86DEC_SHAPE_YMM_REG,
+  X86DEC_SHAPE_YMM_RM,
+  X86DEC_SHAPE_YMM_OR_MEM,
+  X86DEC_SHAPE_VEX_VVVV,
+  X86DEC_SHAPE_VEX_VVVV_GPR,
+  X86DEC_SHAPE_YMM32,
+  X86DEC_SHAPE_YMM64
 };
 
 typedef struct {
   uint16_t mnemonic;
   uint8_t count;
-  uint8_t shapes[3];
-  uint8_t fixed[3];
+  uint8_t shapes[4];
+  uint8_t fixed[4];
   uint8_t flags;
   uint16_t mem_bits;
+  uint8_t is_vex;
+  uint8_t vex_l;
+  uint8_t vex_w;
+  uint8_t vex_vvvv;
+  uint8_t vex_r;
+  uint8_t vex_x;
+  uint8_t vex_b;
+  uint8_t vex_pp;
+  uint8_t vex_map;
+  uint8_t vex_opcode;
 } X86decEntry;
 
 #define X86DEC_ENTRY_MODRM 0x01u
@@ -72,7 +92,7 @@ typedef struct {
 #define X86DEC_ENTRY_GROUP(g) ((uint8_t)((g) << X86DEC_ENTRY_GROUP_SHIFT))
 
 #define X86DEC_E(mn, c, s0, s1, s2, f0, f1, fl) \
-  {(mn), (c), {(s0), (s1), (s2)}, {(f0), (f1)}, (fl)}
+  {(mn), (c), {(s0), (s1), (s2), 0}, {(f0), (f1), 0, 0}, (fl)}
 
 enum x86dec_group_e {
   X86DEC_GROUP_NONE = 0,
@@ -114,7 +134,7 @@ extern const X86decEntry x86dec_map1[256];
 typedef struct {
   uint16_t mnemonic;
   uint8_t count;
-  uint8_t shapes[3];
+  uint8_t shapes[4];
   uint16_t mem_bits;
 } X86decSseVariant;
 
@@ -129,6 +149,9 @@ extern const X86decSseEntry x86dec_sse_mov[256];
 extern const X86decSseEntry x86dec_sse_alu[256];
 extern const X86decSseEntry x86dec_0f38[256];
 extern const X86decSseEntry x86dec_0f3a[256];
+extern const X86decSseEntry x86dec_vex_0f[256];
+extern const X86decSseEntry x86dec_vex_0f38[256];
+extern const X86decSseEntry x86dec_vex_0f3a[256];
 extern const uint16_t x86dec_3dnow[256];
 
 enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,

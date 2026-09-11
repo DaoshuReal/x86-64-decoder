@@ -323,13 +323,15 @@ static int check_one(const X86decDecoder* dec64, const X86decDecoder* dec32,
   return 0;
 }
 
+static const uint8_t bench_corpus[] = {
+  0x48, 0x89, 0xE5, 0x48, 0x83, 0xEC, 0x28, 0x8B, 0x45, 0x08,
+  0x0F, 0xAF, 0xC1, 0xE8, 0x00, 0x00, 0x00, 0x00, 0xC3, 0x90,
+  0x0F, 0x1F, 0x44, 0x00, 0x00, 0x48, 0x8B, 0x4C, 0x24, 0x08
+};
+#define BENCH_REPS 200000
+
 static void bench(const X86decDecoder* dec)
 {
-  static const uint8_t corpus[] = {
-    0x48, 0x89, 0xE5, 0x48, 0x83, 0xEC, 0x28, 0x8B, 0x45, 0x08,
-    0x0F, 0xAF, 0xC1, 0xE8, 0x00, 0x00, 0x00, 0x00, 0xC3, 0x90,
-    0x0F, 0x1F, 0x44, 0x00, 0x00, 0x48, 0x8B, 0x4C, 0x24, 0x08
-  };
   X86decInsn insn;
   X86decOperand ops[4];
   LARGE_INTEGER freq;
@@ -343,12 +345,12 @@ static void bench(const X86decDecoder* dec)
   QueryPerformanceFrequency(&freq);
   QueryPerformanceCounter(&start);
 
-  for (reps = 0; reps < 200000; reps++) {
+  for (reps = 0; reps < BENCH_REPS; reps++) {
     size_t offset = 0;
 
-    while (offset < sizeof(corpus)) {
-      if (x86dec_decode_full(dec, corpus + offset, sizeof(corpus) - offset, &insn,
-          ops, 4) != X86DEC_OK) {
+    while (offset < sizeof(bench_corpus)) {
+      if (x86dec_decode_full(dec, bench_corpus + offset,
+          sizeof(bench_corpus) - offset, &insn, ops, 4) != X86DEC_OK) {
         break;
       }
 
@@ -362,8 +364,141 @@ static void bench(const X86decDecoder* dec)
   elapsed = (unsigned long long)(end.QuadPart - start.QuadPart);
   micros = elapsed * 1000000ULL / (unsigned long long)freq.QuadPart;
 
-  printf("decoded %llu insns in %llu us (%.2f M insns/s)\n", count, micros,
-      (double)count / (double)micros);
+  printf("decoded %llu insns in %llu us (%.2f M insns/s) [full, 1 thread]\n",
+      count, micros, (double)count / (double)micros);
+}
+
+static void bench_insn_only(const X86decDecoder* dec)
+{
+  X86decInsn insn;
+  LARGE_INTEGER freq;
+  LARGE_INTEGER start;
+  LARGE_INTEGER end;
+  unsigned long long elapsed;
+  unsigned long long micros;
+  unsigned long long count = 0;
+  int reps;
+
+  QueryPerformanceFrequency(&freq);
+  QueryPerformanceCounter(&start);
+
+  for (reps = 0; reps < BENCH_REPS; reps++) {
+    size_t offset = 0;
+
+    while (offset < sizeof(bench_corpus)) {
+      if (x86dec_decode_insn(dec, NULL, bench_corpus + offset,
+          sizeof(bench_corpus) - offset, &insn) != X86DEC_OK) {
+        break;
+      }
+
+      offset += insn.length;
+      count++;
+    }
+  }
+
+  QueryPerformanceCounter(&end);
+
+  elapsed = (unsigned long long)(end.QuadPart - start.QuadPart);
+  micros = elapsed * 1000000ULL / (unsigned long long)freq.QuadPart;
+
+  printf("decoded %llu insns in %llu us (%.2f M insns/s) [insn-only, 1 thread]\n",
+      count, micros, (double)count / (double)micros);
+}
+
+typedef struct {
+  const X86decDecoder* dec;
+  int reps;
+  unsigned long long count;
+} BenchThreadData;
+
+static DWORD WINAPI bench_thread_proc(LPVOID param)
+{
+  BenchThreadData* data = (BenchThreadData*)param;
+  X86decInsn insn;
+  X86decOperand ops[4];
+  int reps;
+  size_t offset;
+  unsigned long long count = 0;
+
+  for (reps = 0; reps < data->reps; reps++) {
+    offset = 0;
+
+    while (offset < sizeof(bench_corpus)) {
+      if (x86dec_decode_full(data->dec, bench_corpus + offset,
+          sizeof(bench_corpus) - offset, &insn, ops, 4) != X86DEC_OK) {
+        break;
+      }
+
+      offset += insn.length;
+      count++;
+    }
+  }
+
+  data->count = count;
+  return 0;
+}
+
+static void bench_mt(const X86decDecoder* dec)
+{
+  SYSTEM_INFO sysinfo;
+  DWORD thread_count;
+  HANDLE handles[64];
+  BenchThreadData thread_data[64];
+  LARGE_INTEGER freq;
+  LARGE_INTEGER start;
+  LARGE_INTEGER end;
+  unsigned long long elapsed;
+  unsigned long long micros;
+  unsigned long long total = 0;
+  int base_reps;
+  int remainder;
+  DWORD i;
+
+  GetSystemInfo(&sysinfo);
+  thread_count = sysinfo.dwNumberOfProcessors;
+
+  if (thread_count < 1) {
+    thread_count = 1;
+  }
+
+  if (thread_count > 64) {
+    thread_count = 64;
+  }
+
+  base_reps = BENCH_REPS / (int)thread_count;
+  remainder = BENCH_REPS % (int)thread_count;
+
+  QueryPerformanceFrequency(&freq);
+  QueryPerformanceCounter(&start);
+
+  for (i = 0; i < thread_count; i++) {
+    thread_data[i].dec = dec;
+    thread_data[i].reps = base_reps + ((int)i < remainder ? 1 : 0);
+    thread_data[i].count = 0;
+    handles[i] = CreateThread(NULL, 0, bench_thread_proc, &thread_data[i], 0,
+        NULL);
+
+    if (!handles[i]) {
+      printf("thread create failed\n");
+      return;
+    }
+  }
+
+  WaitForMultipleObjects(thread_count, handles, TRUE, INFINITE);
+
+  for (i = 0; i < thread_count; i++) {
+    total += thread_data[i].count;
+    CloseHandle(handles[i]);
+  }
+
+  QueryPerformanceCounter(&end);
+
+  elapsed = (unsigned long long)(end.QuadPart - start.QuadPart);
+  micros = elapsed * 1000000ULL / (unsigned long long)freq.QuadPart;
+
+  printf("decoded %llu insns in %llu us (%.2f M insns/s) [full, %u threads]\n",
+      total, micros, (double)total / (double)micros,
+      (unsigned)thread_count);
 }
 
 int main(void)
@@ -398,6 +533,8 @@ int main(void)
   printf("%u/%u vectors passed\n", (unsigned)(total - fails),
       (unsigned)total);
   bench(&dec64);
+  bench_insn_only(&dec64);
+  bench_mt(&dec64);
 
   return fails ? 1 : 0;
 }

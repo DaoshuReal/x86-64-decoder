@@ -2,6 +2,7 @@
 
 #include "scan.h"
 #include "tables.h"
+#include "vex.h"
 
 static uint8_t shape_imm_bytes(uint8_t shape, uint8_t eosz)
 {
@@ -58,14 +59,14 @@ bool x86dec_decoder_init(X86decDecoder* decoder,
   return true;
 }
 
-enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
-    X86decContext* context, const void* buffer, size_t length,
-    X86decInsn* insn)
+enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* restrict decoder,
+    X86decContext* restrict context, const void* restrict buffer, size_t length,
+    X86decInsn* restrict insn)
 {
   X86decCursor cursor;
   X86decRaw raw = {0};
   X86decContext local;
-  X86decEntry resolved;
+  X86decEntry resolved = {0};
   const X86decEntry* base;
   uint8_t eosz;
   uint8_t easz;
@@ -81,7 +82,7 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
   int use_synth = 0;
   enum x86dec_status_e st;
 
-  if (!decoder || !buffer || !insn || !length) {
+  if (X86DEC_UNLIKELY(!decoder || !buffer || !insn || !length)) {
     return X86DEC_BAD_ARG;
   }
 
@@ -102,7 +103,7 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
 
   st = x86dec_scan_prefixes(&cursor, &raw);
 
-  if (st != X86DEC_OK) {
+  if (X86DEC_UNLIKELY(st != X86DEC_OK)) {
     return st;
   }
 
@@ -114,7 +115,8 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
     easz = is64 ? 32 : (easz == 16 ? 32 : 16);
   }
 
-  if (is64 && cursor.left && (cursor.p[0] & 0xF0) == 0x40) {
+  if (X86DEC_LIKELY(is64) && X86DEC_LIKELY(cursor.left) &&
+      (cursor.p[0] & 0xF0) == 0x40) {
     raw.has_rex = true;
     raw.rex = cursor.p[0];
     cursor.p++;
@@ -128,19 +130,19 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
 
   raw.opcode_offset = (uint8_t)cursor.pos;
 
-  if (!x86dec_take(&cursor, &opcode)) {
+  if (X86DEC_UNLIKELY(!x86dec_take(&cursor, &opcode))) {
     return X86DEC_NEED_MORE;
   }
 
   if (opcode == 0x0F) {
-    if (!x86dec_take(&cursor, &b)) {
+    if (X86DEC_UNLIKELY(!x86dec_take(&cursor, &b))) {
       return X86DEC_NEED_MORE;
     }
 
     if (b == 0x38 || b == 0x3A) {
       map = b == 0x38 ? 2 : 3;
 
-      if (!x86dec_take(&cursor, &opcode)) {
+      if (X86DEC_UNLIKELY(!x86dec_take(&cursor, &opcode))) {
         return X86DEC_NEED_MORE;
       }
     } else {
@@ -149,22 +151,30 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
     }
   }
 
-  if (is64 && !map && opcode == 0xC5 && cursor.left >= 2 &&
-      cursor.p[0] == 0xF8 && cursor.p[1] == 0x77) {
-    cursor.p += 2;
-    cursor.left -= 2;
-    cursor.pos += 2;
-    synth.mnemonic = X86DEC_MNEMONIC_VZEROUPPER;
-    use_synth = 1;
-  } else if (is64 && !map && opcode == 0xC4 && cursor.left >= 3 &&
-      cursor.p[0] == 0xE1 && cursor.p[1] == 0x7C && cursor.p[2] == 0xC0) {
+  if (X86DEC_UNLIKELY(is64 && !map && opcode == 0xC4 && cursor.left >= 3 &&
+      cursor.p[0] == 0xE1 && cursor.p[1] == 0x7C && cursor.p[2] == 0xC0)) {
     cursor.p += 3;
     cursor.left -= 3;
     cursor.pos += 3;
     synth.mnemonic = X86DEC_MNEMONIC_VZEROALL;
     use_synth = 1;
-  } else if (is64 && !map &&
-      (opcode == 0xC4 || opcode == 0xC5 || opcode == 0x62)) {
+  } else if (X86DEC_UNLIKELY(is64 && !map &&
+      (opcode == 0xC4 || opcode == 0xC5))) {
+    cursor.p--;
+    cursor.left++;
+    cursor.pos--;
+
+    {
+      enum x86dec_status_e vs = x86dec_decode_vex(decoder, &cursor, &raw, &synth, &fx);
+
+      if (X86DEC_LIKELY(vs == X86DEC_OK)) {
+        use_synth = 1;
+      } else {
+        fill_error(insn, decoder, map, opcode, cursor.pos);
+        return vs;
+      }
+    }
+  } else if (X86DEC_UNLIKELY(is64 && !map && opcode == 0x62)) {
     fill_error(insn, decoder, map, opcode, cursor.pos);
     return X86DEC_UNSUPPORTED;
   }
@@ -199,18 +209,206 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
     fx |= X86DEC_FX_REX;
   }
 
-  if (use_synth) {
+  if (X86DEC_UNLIKELY(use_synth)) {
     resolved = synth;
-  } else if (map >= 2) {
+    if (raw.lock) {
+      fill_error(insn, decoder, map, opcode, cursor.pos);
+      insn->raw = raw;
+      return X86DEC_INVALID;
+    }
+    if (raw.has_rex) {
+      fill_error(insn, decoder, map, opcode, cursor.pos);
+      insn->raw = raw;
+      return X86DEC_INVALID;
+    }
+    if (resolved.count > 0) {
+      st = x86dec_scan_tail(&cursor, easz, &raw);
+      if (st != X86DEC_OK) {
+        return st;
+      }
+      {
+        uint8_t mod = (uint8_t)(raw.modrm >> 6);
+        uint8_t reg = (uint8_t)((raw.modrm >> 3) & 7);
+        uint8_t k;
+        if (resolved.mnemonic == 0 && resolved.is_vex &&
+            resolved.vex_map == 2 && resolved.vex_opcode == 0xF3 &&
+            resolved.vex_pp == 0) {
+          uint8_t l = resolved.vex_l;
+          if (l != 0) {
+            fill_error(insn, decoder, map, opcode, cursor.pos);
+            insn->raw = raw;
+            return X86DEC_INVALID;
+          }
+          resolved.count = 2;
+          resolved.shapes[0] = X86DEC_SHAPE_VEX_VVVV_GPR;
+          resolved.shapes[1] = X86DEC_SHAPE_GPR_OR_MEM;
+          resolved.shapes[2] = X86DEC_SHAPE_NONE;
+          resolved.shapes[3] = X86DEC_SHAPE_NONE;
+          switch (reg) {
+            case 1:
+              resolved.mnemonic = X86DEC_MNEMONIC_BLSR;
+              break;
+            case 2:
+              resolved.mnemonic = X86DEC_MNEMONIC_BLSMSK;
+              break;
+            case 3:
+              resolved.mnemonic = X86DEC_MNEMONIC_BLSI;
+              break;
+            default:
+              fill_error(insn, decoder, map, opcode, cursor.pos);
+              insn->raw = raw;
+              return X86DEC_INVALID;
+          }
+        }
+        if (resolved.mnemonic == 0 && resolved.is_vex &&
+            resolved.vex_map == 1 && resolved.vex_pp == 1 &&
+            resolved.vex_opcode >= 0x71 && resolved.vex_opcode <= 0x73) {
+          uint8_t vex_op = resolved.vex_opcode;
+          resolved.count = 2;
+          resolved.shapes[1] = X86DEC_SHAPE_IMM8;
+          resolved.shapes[2] = X86DEC_SHAPE_NONE;
+          resolved.shapes[3] = X86DEC_SHAPE_NONE;
+          if (vex_op == 0x71) {
+            resolved.shapes[0] = X86DEC_SHAPE_XMM_OR_MEM;
+            switch (reg) {
+              case 2:
+                resolved.mnemonic = X86DEC_MNEMONIC_VPSRLW;
+                break;
+              case 4:
+                resolved.mnemonic = X86DEC_MNEMONIC_VPSRAW;
+                break;
+              case 6:
+                resolved.mnemonic = X86DEC_MNEMONIC_VPSLLW;
+                break;
+              default:
+                fill_error(insn, decoder, map, opcode, cursor.pos);
+                insn->raw = raw;
+                return X86DEC_INVALID;
+            }
+          } else if (vex_op == 0x72) {
+            resolved.shapes[0] = X86DEC_SHAPE_XMM_OR_MEM;
+            switch (reg) {
+              case 2:
+                resolved.mnemonic = X86DEC_MNEMONIC_VPSRLD;
+                break;
+              case 4:
+                resolved.mnemonic = X86DEC_MNEMONIC_VPSRAD;
+                break;
+              case 6:
+                resolved.mnemonic = X86DEC_MNEMONIC_VPSLLD;
+                break;
+              default:
+                fill_error(insn, decoder, map, opcode, cursor.pos);
+                insn->raw = raw;
+                return X86DEC_INVALID;
+            }
+          } else {
+            resolved.shapes[0] = X86DEC_SHAPE_XMM_OR_MEM;
+            switch (reg) {
+              case 2:
+                resolved.mnemonic = X86DEC_MNEMONIC_VPSRLQ;
+                break;
+              case 3:
+                resolved.mnemonic = X86DEC_MNEMONIC_VPSRLDQ;
+                break;
+              case 6:
+                resolved.mnemonic = X86DEC_MNEMONIC_VPSLLQ;
+                break;
+              case 7:
+                resolved.mnemonic = X86DEC_MNEMONIC_VPSLLDQ;
+                break;
+              default:
+                fill_error(insn, decoder, map, opcode, cursor.pos);
+                insn->raw = raw;
+                return X86DEC_INVALID;
+            }
+            if ((resolved.mnemonic == X86DEC_MNEMONIC_VPSRLDQ ||
+                resolved.mnemonic == X86DEC_MNEMONIC_VPSLLDQ) &&
+                resolved.vex_l != 0) {
+              fill_error(insn, decoder, map, opcode, cursor.pos);
+              insn->raw = raw;
+              return X86DEC_INVALID;
+            }
+          }
+        }
+        if (resolved.mnemonic == 0) {
+          fill_error(insn, decoder, map, opcode, cursor.pos);
+          insn->raw = raw;
+          return X86DEC_UNSUPPORTED;
+        }
+        for (k = 0; k < resolved.count; k++) {
+          switch (resolved.shapes[k]) {
+            case X86DEC_SHAPE_MEM_RM:
+            case X86DEC_SHAPE_MEM8_RM:
+            case X86DEC_SHAPE_MEM16_RM:
+            case X86DEC_SHAPE_MEM32_RM:
+            case X86DEC_SHAPE_MEM64_RM:
+            case X86DEC_SHAPE_MEM80_RM:
+              if (mod == 3) {
+                fill_error(insn, decoder, map, opcode, cursor.pos);
+                insn->raw = raw;
+                return X86DEC_INVALID;
+              }
+              break;
+            case X86DEC_SHAPE_GPR_RM:
+            case X86DEC_SHAPE_GPR8_RM:
+            case X86DEC_SHAPE_XMM_RM:
+            case X86DEC_SHAPE_XMM32:
+            case X86DEC_SHAPE_XMM64:
+            case X86DEC_SHAPE_MM32:
+            case X86DEC_SHAPE_MM_RM:
+            case X86DEC_SHAPE_YMM_RM:
+            case X86DEC_SHAPE_YMM32:
+            case X86DEC_SHAPE_YMM64:
+              if (mod != 3) {
+                fill_error(insn, decoder, map, opcode, cursor.pos);
+                insn->raw = raw;
+                return X86DEC_INVALID;
+              }
+              break;
+            default:
+              break;
+          }
+        }
+        switch (resolved.mnemonic) {
+          case X86DEC_MNEMONIC_VMOVNTPS:
+          case X86DEC_MNEMONIC_VMOVNTPD:
+          case X86DEC_MNEMONIC_VMOVNTDQ:
+          case X86DEC_MNEMONIC_VMOVNTDQA:
+          case X86DEC_MNEMONIC_VBROADCASTSS:
+          case X86DEC_MNEMONIC_VBROADCASTSD:
+          case X86DEC_MNEMONIC_VBROADCASTF128:
+          case X86DEC_MNEMONIC_VMASKMOVPS:
+          case X86DEC_MNEMONIC_VMASKMOVPD:
+            if (mod == 3) {
+              int need_mem = 0;
+              if (resolved.mnemonic == X86DEC_MNEMONIC_VMOVNTPS ||
+                  resolved.mnemonic == X86DEC_MNEMONIC_VMOVNTPD ||
+                  resolved.mnemonic == X86DEC_MNEMONIC_VMOVNTDQ) {
+                need_mem = 1;
+              }
+              if (need_mem) {
+                fill_error(insn, decoder, map, opcode, cursor.pos);
+                insn->raw = raw;
+                return X86DEC_INVALID;
+              }
+            }
+            break;
+          default:
+            break;
+        }
+      }
+    }
+  } else if (X86DEC_UNLIKELY(map >= 2)) {
     st = x86dec_scan_tail(&cursor, easz, &raw);
 
-    if (st != X86DEC_OK) {
+    if (X86DEC_UNLIKELY(st != X86DEC_OK)) {
       return st;
     }
 
     st = x86dec_resolve_crypto(map, opcode, raw.modrm, fx, &resolved);
 
-    if (st != X86DEC_OK) {
+    if (X86DEC_UNLIKELY(st != X86DEC_OK)) {
       fill_error(insn, decoder, map, opcode, cursor.pos);
       insn->raw = raw;
       return st;
@@ -221,22 +419,22 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
     if (base->flags & X86DEC_ENTRY_MODRM) {
       st = x86dec_scan_tail(&cursor, easz, &raw);
 
-      if (st != X86DEC_OK) {
+      if (X86DEC_UNLIKELY(st != X86DEC_OK)) {
         return st;
       }
     }
 
     tail = 0;
 
-    if (map == 1 && opcode == 0x0F) {
-      if (!x86dec_take(&cursor, &tail)) {
+    if (X86DEC_UNLIKELY(map == 1 && opcode == 0x0F)) {
+      if (X86DEC_UNLIKELY(!x86dec_take(&cursor, &tail))) {
         return X86DEC_NEED_MORE;
       }
     }
 
     st = x86dec_resolve(map, opcode, raw.modrm, tail, fx, &resolved);
 
-    if (st != X86DEC_OK) {
+    if (X86DEC_UNLIKELY(st != X86DEC_OK)) {
       fill_error(insn, decoder, map, opcode, cursor.pos);
       insn->raw = raw;
       return st;
@@ -295,7 +493,7 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
     byte_count = shape_imm_bytes(resolved.shapes[i], eosz);
 
     for (k = 0; k < byte_count; k++) {
-      if (!x86dec_take(&cursor, &b)) {
+      if (X86DEC_UNLIKELY(!x86dec_take(&cursor, &b))) {
         return X86DEC_NEED_MORE;
       }
 
@@ -304,7 +502,7 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
     }
   }
 
-  if (cursor.pos > X86DEC_MAX_INSN_LENGTH) {
+  if (X86DEC_UNLIKELY(cursor.pos > X86DEC_MAX_INSN_LENGTH)) {
     fill_error(insn, decoder, map, opcode, cursor.pos);
     insn->raw = raw;
     return X86DEC_INVALID;
@@ -378,17 +576,39 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
   context->fixed[1] = resolved.fixed[1];
   context->fixed[2] = resolved.fixed[2];
   context->length = (uint8_t)cursor.pos;
-  context->opcode = opcode;
-  context->map = map;
   context->flags = insn->flags;
   context->mem_bits = resolved.mem_bits;
+  context->is_vex = resolved.is_vex;
+  if (resolved.is_vex) {
+    context->shapes[3] = resolved.shapes[3];
+    context->fixed[3] = resolved.fixed[3];
+    context->vex_l = resolved.vex_l;
+    context->vex_w = resolved.vex_w;
+    context->vex_vvvv = resolved.vex_vvvv;
+    context->vex_r = resolved.vex_r;
+    context->vex_x = resolved.vex_x;
+    context->vex_b = resolved.vex_b;
+    context->vex_pp = resolved.vex_pp;
+    context->vex_map = resolved.vex_map;
+    context->vex_opcode = resolved.vex_opcode;
+  }
+  if (resolved.is_vex) {
+    context->opcode = resolved.vex_opcode;
+    context->map = resolved.vex_map;
+  } else {
+    context->opcode = opcode;
+    context->map = map;
+  }
+
+  insn->map = context->map;
+  insn->opcode = context->opcode;
 
   return X86DEC_OK;
 }
 
-enum x86dec_status_e x86dec_decode_full(const X86decDecoder* decoder,
-    const void* buffer, size_t length, X86decInsn* insn,
-    X86decOperand* operands, uint8_t operand_count)
+enum x86dec_status_e x86dec_decode_full(const X86decDecoder* restrict decoder,
+    const void* restrict buffer, size_t length, X86decInsn* restrict insn,
+    X86decOperand* restrict operands, uint8_t operand_count)
 {
   X86decContext context;
   enum x86dec_status_e st;

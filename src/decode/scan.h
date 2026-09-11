@@ -14,7 +14,7 @@ typedef struct {
 
 static inline int x86dec_take(X86decCursor* cursor, uint8_t* out)
 {
-  if (!cursor->left) {
+  if (X86DEC_UNLIKELY(!cursor->left)) {
     return 0;
   }
 
@@ -27,6 +27,7 @@ static inline int x86dec_take(X86decCursor* cursor, uint8_t* out)
 
 uint8_t x86dec_default_eosz(const X86decDecoder* decoder);
 uint8_t x86dec_default_easz(const X86decDecoder* decoder);
-enum x86dec_status_e x86dec_scan_prefixes(X86decCursor* cursor, X86decRaw* raw);
-enum x86dec_status_e x86dec_scan_tail(X86decCursor* cursor, uint8_t easz,
-    X86decRaw* raw);
+enum x86dec_status_e x86dec_scan_prefixes(X86decCursor* restrict cursor,
+    X86decRaw* restrict raw);
+enum x86dec_status_e x86dec_scan_tail(X86decCursor* restrict cursor, uint8_t easz,
+    X86decRaw* restrict raw);

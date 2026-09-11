@@ -2,8 +2,8 @@
 
 #define M(x) X86DEC_MNEMONIC_##x
 #define S(x) X86DEC_SHAPE_##x
-#define V(mn, c, s0, s1, s2, mb) {(mn), (c), {(s0), (s1), (s2)}, (mb)}
-#define NOVAR {0, 0, {0, 0, 0}, 0}
+#define V(mn, c, s0, s1, s2, mb) {(mn), (c), {(s0), (s1), (s2), 0}, (mb)}
+#define NOVAR {0, 0, {0, 0, 0, 0}, 0}
 
 const X86decSseEntry x86dec_0f38[256] = {
 [0x00] = {
@@ -55,13 +55,13 @@ const X86decSseEntry x86dec_0f38[256] = {
   .variant_66 = V(M(PMULHRSW), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 0),
 },
 [0x10] = {
-  .variant_66 = V(M(PBLENDVB), 3, S(XMM_REG), S(XMM_OR_MEM), S(IMPLICIT_GPR), 0),
+  .variant_66 = V(M(PBLENDVB), 3, S(XMM_REG), S(XMM_OR_MEM), S(IMPLICIT_XMM0), 0),
 },
 [0x14] = {
-  .variant_66 = V(M(BLENDVPS), 3, S(XMM_REG), S(XMM_OR_MEM), S(IMPLICIT_GPR), 0),
+  .variant_66 = V(M(BLENDVPS), 3, S(XMM_REG), S(XMM_OR_MEM), S(IMPLICIT_XMM0), 0),
 },
 [0x15] = {
-  .variant_66 = V(M(BLENDVPD), 3, S(XMM_REG), S(XMM_OR_MEM), S(IMPLICIT_GPR), 0),
+  .variant_66 = V(M(BLENDVPD), 3, S(XMM_REG), S(XMM_OR_MEM), S(IMPLICIT_XMM0), 0),
 },
 [0x17] = {
   .variant_66 = V(M(PTEST), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 0),

@@ -1,7 +1,7 @@
 #include "scan.h"
 
-enum x86dec_status_e x86dec_scan_tail(X86decCursor* cursor, uint8_t easz,
-    X86decRaw* raw)
+enum x86dec_status_e x86dec_scan_tail(X86decCursor* restrict cursor, uint8_t easz,
+    X86decRaw* restrict raw)
 {
   uint8_t modrm;
   uint8_t mod;

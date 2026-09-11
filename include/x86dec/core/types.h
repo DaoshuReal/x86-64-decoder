@@ -6,6 +6,14 @@
 #define X86DEC_MAX_INSN_LENGTH 15
 #define X86DEC_MAX_OPERANDS 10
 
+#if defined(__clang__) || defined(__GNUC__)
+#define X86DEC_LIKELY(x) __builtin_expect(!!(x), 1)
+#define X86DEC_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#define X86DEC_LIKELY(x) (x)
+#define X86DEC_UNLIKELY(x) (x)
+#endif
+
 enum x86dec_status_e {
   X86DEC_OK = 0,
   X86DEC_NEED_MORE = 1,

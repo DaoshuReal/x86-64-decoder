@@ -2,8 +2,8 @@
 
 #define M(x) X86DEC_MNEMONIC_##x
 #define S(x) X86DEC_SHAPE_##x
-#define V(mn, c, s0, s1, s2, mb) {(mn), (c), {(s0), (s1), (s2)}, (mb)}
-#define NOVAR {0, 0, {0, 0, 0}, 0}
+#define V(mn, c, s0, s1, s2, mb) {(mn), (c), {(s0), (s1), (s2), 0}, (mb)}
+#define NOVAR {0, 0, {0, 0, 0, 0}, 0}
 
 const X86decSseEntry x86dec_sse_mov[256] = {
 [0x10] = {
@@ -87,8 +87,8 @@ const X86decSseEntry x86dec_sse_mov[256] = {
 [0xD6] = {
   .base = NOVAR,
   .variant_66 = NOVAR,
-  .variant_f3 = V(M(MOVQ2DQ), 2, S(XMM_REG), S(XMM_RM), S(NONE), 0),
-  .variant_f2 = V(M(MOVDQ2Q), 2, S(XMM_REG), S(XMM_RM), S(NONE), 0),
+  .variant_f3 = V(M(MOVQ2DQ), 2, S(XMM_REG), S(MM_OR_MEM), S(NONE), 0),
+  .variant_f2 = V(M(MOVDQ2Q), 2, S(MM_REG), S(XMM_OR_MEM), S(NONE), 64),
 },
 [0xD7] = {
   .base = V(M(PMOVMSKB), 2, S(R32_REG), S(MM_OR_MEM), S(NONE), 0),

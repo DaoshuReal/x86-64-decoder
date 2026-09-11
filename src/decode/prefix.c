@@ -20,53 +20,64 @@ uint8_t x86dec_default_easz(const X86decDecoder* decoder)
   return x86dec_default_eosz(decoder);
 }
 
-enum x86dec_status_e x86dec_scan_prefixes(X86decCursor* cursor, X86decRaw* raw)
+static const uint8_t x86dec_prefix_action[256] = {
+  [0xF0] = 1, [0xF3] = 2, [0xF2] = 3,
+  [0x2E] = 4, [0x36] = 5, [0x3E] = 6, [0x26] = 7,
+  [0x64] = 8, [0x65] = 9, [0x66] = 10, [0x67] = 11,
+};
+
+enum x86dec_status_e x86dec_scan_prefixes(X86decCursor* restrict cursor,
+    X86decRaw* restrict raw)
 {
   for (;;) {
     uint8_t b;
+    uint8_t a;
 
-    if (!cursor->left || raw->count >= 8) {
+    if (X86DEC_UNLIKELY(!cursor->left || raw->count >= 8)) {
       return X86DEC_OK;
     }
 
     b = *cursor->p;
+    a = x86dec_prefix_action[b];
 
-    switch (b) {
-      case 0xF0:
+    if (X86DEC_LIKELY(!a)) {
+      return X86DEC_OK;
+    }
+
+    switch (a) {
+      case 1:
         raw->lock = true;
         break;
-      case 0xF2:
-        raw->repne = true;
-        break;
-      case 0xF3:
+      case 2:
         raw->rep = true;
         break;
-      case 0x2E:
+      case 3:
+        raw->repne = true;
+        break;
+      case 4:
         raw->segment = X86DEC_REG_CS;
         break;
-      case 0x36:
+      case 5:
         raw->segment = X86DEC_REG_SS;
         break;
-      case 0x3E:
+      case 6:
         raw->segment = X86DEC_REG_DS;
         break;
-      case 0x26:
+      case 7:
         raw->segment = X86DEC_REG_ES;
         break;
-      case 0x64:
+      case 8:
         raw->segment = X86DEC_REG_FS;
         break;
-      case 0x65:
+      case 9:
         raw->segment = X86DEC_REG_GS;
         break;
-      case 0x66:
+      case 10:
         raw->osz = true;
         break;
-      case 0x67:
+      default:
         raw->asz = true;
         break;
-      default:
-        return X86DEC_OK;
     }
 
     raw->bytes[raw->count++] = b;
