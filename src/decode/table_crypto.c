@@ -3,6 +3,39 @@
 #define M(x) X86DEC_MNEMONIC_##x
 #define S(x) X86DEC_SHAPE_##x
 
+static int has_0f38_row(const X86decSseEntry* e)
+{
+  return e->base.mnemonic || e->variant_66.mnemonic || e->variant_f3.mnemonic ||
+      e->variant_f2.mnemonic;
+}
+
+static enum x86dec_status_e pick_0f38(const X86decSseEntry* e, uint16_t fx,
+    X86decEntry* out)
+{
+  const X86decSseVariant* v = &e->base;
+
+  if (fx & X86DEC_FX_F3) {
+    v = &e->variant_f3;
+  } else if (fx & X86DEC_FX_F2) {
+    v = &e->variant_f2;
+  } else if (fx & X86DEC_FX_66) {
+    v = &e->variant_66;
+  }
+
+  if (!v->mnemonic) {
+    return X86DEC_INVALID;
+  }
+
+  out->mnemonic = v->mnemonic;
+  out->count = v->count;
+  out->shapes[0] = v->shapes[0];
+  out->shapes[1] = v->shapes[1];
+  out->shapes[2] = v->shapes[2];
+  out->mem_bits = v->mem_bits;
+
+  return X86DEC_OK;
+}
+
 static void crypto_fill_xmm(X86decEntry* out, uint16_t mnemonic)
 {
   out->mnemonic = mnemonic;
@@ -225,10 +258,22 @@ enum x86dec_status_e x86dec_resolve_crypto(uint8_t map, uint8_t opcode,
   (void)modrm;
 
   if (map == 2) {
+    const X86decSseEntry* e = &x86dec_0f38[opcode];
+
+    if (has_0f38_row(e)) {
+      return pick_0f38(e, fx, out);
+    }
+
     return resolve_38(opcode, fx, out);
   }
 
   if (map == 3) {
+    const X86decSseEntry* e = &x86dec_0f3a[opcode];
+
+    if (has_0f38_row(e)) {
+      return pick_0f38(e, fx, out);
+    }
+
     return resolve_3a(opcode, fx, out);
   }
 

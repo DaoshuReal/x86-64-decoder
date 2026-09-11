@@ -127,6 +127,8 @@ typedef struct {
 
 extern const X86decSseEntry x86dec_sse_mov[256];
 extern const X86decSseEntry x86dec_sse_alu[256];
+extern const X86decSseEntry x86dec_0f38[256];
+extern const X86decSseEntry x86dec_0f3a[256];
 extern const uint16_t x86dec_3dnow[256];
 
 enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
