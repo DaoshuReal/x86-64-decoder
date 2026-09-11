@@ -97,6 +97,43 @@ static enum x86dec_status_e resolve_shift(uint8_t opcode, uint8_t modrm,
   return X86DEC_OK;
 }
 
+static enum x86dec_status_e resolve_movdq(uint8_t opcode, uint16_t fx,
+    X86decEntry* out)
+{
+  int has_66 = (fx & X86DEC_FX_66) != 0;
+  int is_movq = (fx & X86DEC_FX_REXW) != 0;
+
+  if (fx & (X86DEC_FX_F3 | X86DEC_FX_F2)) {
+    return X86DEC_INVALID;
+  }
+
+  out->count = 2;
+  out->mem_bits = 0;
+  out->mnemonic = is_movq ? M(MOVQ) : M(MOVD);
+
+  if (opcode == 0x6E) {
+    out->shapes[1] = is_movq ? S(GPR_OR_MEM) : S(R32_OR_MEM);
+    out->shapes[2] = S(NONE);
+
+    if (has_66) {
+      out->shapes[0] = is_movq ? S(XMM64) : S(XMM_REG);
+    } else {
+      out->shapes[0] = S(MM_REG);
+    }
+  } else {
+    out->shapes[0] = is_movq ? S(GPR_OR_MEM) : S(R32_OR_MEM);
+    out->shapes[2] = S(NONE);
+
+    if (has_66) {
+      out->shapes[1] = is_movq ? S(XMM64) : S(XMM32);
+    } else {
+      out->shapes[1] = is_movq ? S(MM_REG) : S(MM32);
+    }
+  }
+
+  return X86DEC_OK;
+}
+
 enum x86dec_status_e x86dec_resolve_sse(uint8_t opcode, uint8_t modrm,
     uint16_t fx, X86decEntry* out)
 {
@@ -114,6 +151,10 @@ enum x86dec_status_e x86dec_resolve_sse(uint8_t opcode, uint8_t modrm,
 
   if (opcode >= 0x71 && opcode <= 0x73) {
     return resolve_shift(opcode, modrm, fx, out);
+  }
+
+  if (opcode == 0x6E || opcode == 0x7E) {
+    return resolve_movdq(opcode, fx, out);
   }
 
   if (!has_row(row)) {

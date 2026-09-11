@@ -27,14 +27,14 @@ const X86decSseEntry x86dec_sse_alu[256] = {
   .variant_f2 = V(M(CVTSD2SI), 2, S(GPR_REG), S(XMM_OR_MEM), S(NONE), 64),
 },
 [0x2E] = {
-  .base = V(M(COMISS), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 32),
-  .variant_66 = V(M(COMISD), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 64),
+  .base = V(M(UCOMISS), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 32),
+  .variant_66 = V(M(UCOMISD), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 64),
   .variant_f3 = NOVAR,
   .variant_f2 = NOVAR,
 },
 [0x2F] = {
-  .base = V(M(UCOMISS), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 32),
-  .variant_66 = V(M(UCOMISD), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 64),
+  .base = V(M(COMISS), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 32),
+  .variant_66 = V(M(COMISD), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 64),
   .variant_f3 = NOVAR,
   .variant_f2 = NOVAR,
 },
@@ -383,8 +383,8 @@ const X86decSseEntry x86dec_sse_alu[256] = {
 [0xE6] = {
   .base = V(M(CVTPI2PD), 2, S(XMM_REG), S(MM_OR_MEM), S(NONE), 0),
   .variant_66 = V(M(CVTTPD2DQ), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 0),
-  .variant_f3 = XX2(M(CVTDQ2PS)),
-  .variant_f2 = XX2(M(CVTPD2DQ)),
+  .variant_f3 = V(M(CVTDQ2PD), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 0),
+  .variant_f2 = V(M(CVTPD2DQ), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 0),
 },
 [0xE8] = {
   .base = MM2(M(PSUBSB)),

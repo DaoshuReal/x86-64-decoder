@@ -37,7 +37,8 @@ static uint64_t take_imm(const X86decContext* ctx, uint8_t* off,
   return value;
 }
 
-static uint16_t mem_size(uint16_t mnemonic, uint8_t eosz, int is64)
+static uint16_t mem_size(uint16_t mnemonic, uint8_t eosz, uint8_t easz,
+    int is64)
 {
   switch (mnemonic) {
     case X86DEC_MNEMONIC_SGDT:
@@ -60,8 +61,107 @@ static uint16_t mem_size(uint16_t mnemonic, uint8_t eosz, int is64)
     case X86DEC_MNEMONIC_FRSTOR:
     case X86DEC_MNEMONIC_FSAVE:
       return eosz == 16 ? 752 : 864;
+    case X86DEC_MNEMONIC_LES:
+    case X86DEC_MNEMONIC_LDS:
+    case X86DEC_MNEMONIC_LFS:
+    case X86DEC_MNEMONIC_LGS:
+    case X86DEC_MNEMONIC_LSS:
+      return eosz == 16 ? 32 : 48;
+    case X86DEC_MNEMONIC_BOUND:
+      return (uint16_t)(eosz * 2);
+    case X86DEC_MNEMONIC_LEA:
+      return easz;
+    case X86DEC_MNEMONIC_CLFLUSH:
+      return 512;
     default:
       return eosz;
+  }
+}
+
+static uint16_t xmm_reg_bits(uint16_t mnemonic, uint8_t index)
+{
+  switch (mnemonic) {
+    case X86DEC_MNEMONIC_ADDSS:
+    case X86DEC_MNEMONIC_SUBSS:
+    case X86DEC_MNEMONIC_MULSS:
+    case X86DEC_MNEMONIC_DIVSS:
+    case X86DEC_MNEMONIC_SQRTSS:
+    case X86DEC_MNEMONIC_MAXSS:
+    case X86DEC_MNEMONIC_MINSS:
+    case X86DEC_MNEMONIC_RCPSS:
+    case X86DEC_MNEMONIC_RSQRTSS:
+    case X86DEC_MNEMONIC_CMPSS:
+    case X86DEC_MNEMONIC_COMISS:
+    case X86DEC_MNEMONIC_UCOMISS:
+    case X86DEC_MNEMONIC_CVTSI2SS:
+      return 32;
+
+    case X86DEC_MNEMONIC_CVTSS2SI:
+    case X86DEC_MNEMONIC_CVTTSS2SI:
+      return 32;
+
+    case X86DEC_MNEMONIC_ADDSD:
+    case X86DEC_MNEMONIC_SUBSD:
+    case X86DEC_MNEMONIC_MULSD:
+    case X86DEC_MNEMONIC_DIVSD:
+    case X86DEC_MNEMONIC_SQRTSD:
+    case X86DEC_MNEMONIC_MAXSD:
+    case X86DEC_MNEMONIC_MINSD:
+    case X86DEC_MNEMONIC_COMISD:
+    case X86DEC_MNEMONIC_UCOMISD:
+    case X86DEC_MNEMONIC_CVTSI2SD:
+    case X86DEC_MNEMONIC_CVTSD2SI:
+    case X86DEC_MNEMONIC_CVTTSD2SI:
+    case X86DEC_MNEMONIC_MOVLPS:
+    case X86DEC_MNEMONIC_MOVLPD:
+    case X86DEC_MNEMONIC_MOVHPS:
+    case X86DEC_MNEMONIC_MOVHPD:
+    case X86DEC_MNEMONIC_MOVLHPS:
+      return 64;
+
+    case X86DEC_MNEMONIC_CVTSS2SD:
+    case X86DEC_MNEMONIC_CVTPI2PS:
+      return index == 0 ? 64 : 32;
+
+    case X86DEC_MNEMONIC_CVTSD2SS:
+      return index == 0 ? 32 : 64;
+
+    case X86DEC_MNEMONIC_CVTPS2PD:
+    case X86DEC_MNEMONIC_CVTDQ2PD:
+      return index == 0 ? 128 : 64;
+
+    case X86DEC_MNEMONIC_CVTPS2PI:
+    case X86DEC_MNEMONIC_CVTTPS2PI:
+      return 64;
+
+    case X86DEC_MNEMONIC_PUNPCKLBW:
+    case X86DEC_MNEMONIC_PUNPCKLWD:
+    case X86DEC_MNEMONIC_PUNPCKLDQ:
+    case X86DEC_MNEMONIC_PUNPCKLQDQ:
+    case X86DEC_MNEMONIC_PUNPCKHBW:
+    case X86DEC_MNEMONIC_PUNPCKHWD:
+    case X86DEC_MNEMONIC_PUNPCKHDQ:
+    case X86DEC_MNEMONIC_PUNPCKHQDQ:
+      return index == 0 ? 128 : 64;
+
+    default:
+      return 128;
+  }
+}
+
+static uint16_t mm_reg_bits(uint16_t mnemonic, uint8_t index)
+{
+  switch (mnemonic) {
+    case X86DEC_MNEMONIC_PUNPCKLBW:
+    case X86DEC_MNEMONIC_PUNPCKLWD:
+    case X86DEC_MNEMONIC_PUNPCKLDQ:
+    case X86DEC_MNEMONIC_PUNPCKHBW:
+    case X86DEC_MNEMONIC_PUNPCKHWD:
+    case X86DEC_MNEMONIC_PUNPCKHDQ:
+      return index == 0 ? 64 : 32;
+
+    default:
+      return 64;
   }
 }
 
@@ -100,9 +200,6 @@ static void build_mem(const X86decContext* ctx, X86decMem* mem, uint8_t seg,
       }
       mem->scale = (uint8_t)(1 << (ctx->sib >> 6));
       if (mod == 0 && base == 5) {
-        if (is64) {
-          mem->base = X86DEC_REG_RIP;
-        }
       } else {
         mem->base = gpr((uint8_t)(base | ext_b), slot);
       }
@@ -114,11 +211,17 @@ static void build_mem(const X86decContext* ctx, X86decMem* mem, uint8_t seg,
       mem->base = gpr((uint8_t)(rm | ext_b), slot);
     }
   }
-  if (seg != X86DEC_REG_NONE) {
+  if (mem->index == X86DEC_REG_NONE) {
+    mem->scale = 0;
+  }
+
+  if (seg != X86DEC_REG_NONE && !(is64 && (seg == X86DEC_REG_CS ||
+      seg == X86DEC_REG_DS || seg == X86DEC_REG_ES ||
+      seg == X86DEC_REG_SS))) {
     mem->segment = (enum x86dec_register_e)seg;
   } else if (mem->base == X86DEC_REG_NONE ||
       mem->base == X86DEC_REG_RIP) {
-    mem->segment = X86DEC_REG_NONE;
+    mem->segment = X86DEC_REG_DS;
   } else {
     sp = gpr(4, slot);
     bp = gpr(5, slot);
@@ -165,15 +268,13 @@ enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* decoder,
       ((context->has_rex && (context->rex & 1)) ? 8 : 0));
   mod = (uint8_t)(context->modrm >> 6);
   for (i = 0; i < context->count; i++) {
-    operands[i] = (X86decOperand){0};
-  }
-  for (i = 0; i < context->count; i++) {
     X86decOperand* op = &operands[i];
     uint8_t shape = context->shapes[i];
     uint8_t byte_count;
     uint64_t value;
     op->id = i;
     op->visibility = X86DEC_OPERAND_VISIBLE;
+    op->imm.is_relative = false;
     switch (shape) {
       case X86DEC_SHAPE_GPR_REG:
         op->type = X86DEC_OPERAND_REG;
@@ -182,8 +283,14 @@ enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* decoder,
         break;
       case X86DEC_SHAPE_GPR_RM:
         op->type = X86DEC_OPERAND_REG;
-        op->reg = cr64 ? gpr(rmf, 0) : gpr(rmf, slot);
-        op->size = cr64 ? 64 : context->eosz;
+        if (cr64 || (is64 && context->mnemonic == X86DEC_MNEMONIC_RDPID &&
+            context->eosz != 16)) {
+          op->reg = gpr(rmf, 0);
+          op->size = 64;
+        } else {
+          op->reg = gpr(rmf, slot);
+          op->size = context->eosz;
+        }
         break;
       case X86DEC_SHAPE_GPR8_REG:
         op->type = X86DEC_OPERAND_REG;
@@ -198,7 +305,8 @@ enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* decoder,
       case X86DEC_SHAPE_MEM_RM:
         op->type = X86DEC_OPERAND_MEM;
         build_mem(context, &op->mem, insn->raw.segment, is64);
-        op->size = mem_size(context->mnemonic, context->eosz, is64);
+        op->size = mem_size(context->mnemonic, context->eosz, context->easz,
+            is64);
         break;
       case X86DEC_SHAPE_MEM8_RM:
         op->type = X86DEC_OPERAND_MEM;
@@ -214,6 +322,17 @@ enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* decoder,
           op->type = X86DEC_OPERAND_MEM;
           build_mem(context, &op->mem, insn->raw.segment, is64);
           op->size = context->eosz;
+        }
+        break;
+      case X86DEC_SHAPE_GPR_OR_MEM16:
+        if (mod == 3) {
+          op->type = X86DEC_OPERAND_REG;
+          op->reg = gpr(rmf, slot);
+          op->size = context->eosz;
+        } else {
+          op->type = X86DEC_OPERAND_MEM;
+          build_mem(context, &op->mem, insn->raw.segment, is64);
+          op->size = 16;
         }
         break;
       case X86DEC_SHAPE_GPR8_OR_MEM:
@@ -340,7 +459,7 @@ enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* decoder,
         op->imm.value = (uint64_t)(int64_t)(int8_t)take_imm(context,
             &imm_off, 1);
         op->imm.is_relative = true;
-        op->size = is64 ? 64 : context->eosz == 16 ? 16 : 32;
+        op->size = 8;
         break;
       case X86DEC_SHAPE_REL_V:
         byte_count = context->eosz == 16 ? 2 : 4;
@@ -349,18 +468,25 @@ enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* decoder,
         op->imm.value = byte_count == 2 ? (uint64_t)(int64_t)(int16_t)value
                                         : (uint64_t)(int64_t)(int32_t)value;
         op->imm.is_relative = true;
-        op->size = is64 ? 64 : context->eosz == 16 ? 16 : 32;
+        op->size = context->eosz == 16 ? 16 : 32;
         break;
       case X86DEC_SHAPE_MOFFS: {
         uint8_t j;
         op->type = X86DEC_OPERAND_MEM;
         op->mem.base = X86DEC_REG_NONE;
         op->mem.index = X86DEC_REG_NONE;
-        op->mem.scale = 1;
+        op->mem.scale = 0;
         op->mem.disp = (int64_t)context->moffs;
         op->mem.has_disp = true;
-        op->mem.segment = insn->raw.segment != X86DEC_REG_NONE
-            ? insn->raw.segment : X86DEC_REG_DS;
+        op->mem.segment = X86DEC_REG_DS;
+
+        if (insn->raw.segment != X86DEC_REG_NONE && !(is64 &&
+            (insn->raw.segment == X86DEC_REG_CS ||
+                insn->raw.segment == X86DEC_REG_DS ||
+                insn->raw.segment == X86DEC_REG_ES ||
+                insn->raw.segment == X86DEC_REG_SS))) {
+          op->mem.segment = insn->raw.segment;
+        }
         op->size = context->eosz;
         for (j = 0; j < context->count; j++) {
           if (context->shapes[j] == X86DEC_SHAPE_FIXED_GPR8) {
@@ -387,13 +513,13 @@ enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* decoder,
       case X86DEC_SHAPE_MM_REG:
         op->type = X86DEC_OPERAND_REG;
         op->reg = (enum x86dec_register_e)(X86DEC_REG_MM0 + (regf & 7));
-        op->size = 64;
+        op->size = mm_reg_bits(context->mnemonic, i);
         break;
       case X86DEC_SHAPE_MM_OR_MEM:
         if (mod == 3) {
           op->type = X86DEC_OPERAND_REG;
           op->reg = (enum x86dec_register_e)(X86DEC_REG_MM0 + (rmf & 7));
-          op->size = 64;
+          op->size = mm_reg_bits(context->mnemonic, i);
         } else {
           op->type = X86DEC_OPERAND_MEM;
           build_mem(context, &op->mem, insn->raw.segment, is64);
@@ -403,18 +529,18 @@ enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* decoder,
       case X86DEC_SHAPE_XMM_REG:
         op->type = X86DEC_OPERAND_REG;
         op->reg = (enum x86dec_register_e)(X86DEC_REG_XMM0 + regf);
-        op->size = 128;
+        op->size = xmm_reg_bits(context->mnemonic, i);
         break;
       case X86DEC_SHAPE_XMM_RM:
         op->type = X86DEC_OPERAND_REG;
         op->reg = (enum x86dec_register_e)(X86DEC_REG_XMM0 + rmf);
-        op->size = 128;
+        op->size = xmm_reg_bits(context->mnemonic, i);
         break;
       case X86DEC_SHAPE_XMM_OR_MEM:
         if (mod == 3) {
           op->type = X86DEC_OPERAND_REG;
           op->reg = (enum x86dec_register_e)(X86DEC_REG_XMM0 + rmf);
-          op->size = 128;
+          op->size = xmm_reg_bits(context->mnemonic, i);
         } else {
           op->type = X86DEC_OPERAND_MEM;
           build_mem(context, &op->mem, insn->raw.segment, is64);
@@ -455,6 +581,44 @@ enum x86dec_status_e x86dec_decode_operands(const X86decDecoder* decoder,
       case X86DEC_SHAPE_MEM80_RM:
         op->type = X86DEC_OPERAND_MEM;
         build_mem(context, &op->mem, insn->raw.segment, is64);
+        op->size = 80;
+        break;
+      case X86DEC_SHAPE_XMM32:
+        op->type = X86DEC_OPERAND_REG;
+        op->reg = (enum x86dec_register_e)(X86DEC_REG_XMM0 + regf);
+        op->size = 32;
+        break;
+      case X86DEC_SHAPE_XMM64:
+        op->type = X86DEC_OPERAND_REG;
+        op->reg = (enum x86dec_register_e)(X86DEC_REG_XMM0 + regf);
+        op->size = 64;
+        break;
+      case X86DEC_SHAPE_MM32:
+        op->type = X86DEC_OPERAND_REG;
+        op->reg = (enum x86dec_register_e)(X86DEC_REG_MM0 + (regf & 7));
+        op->size = 32;
+        break;
+      case X86DEC_SHAPE_IMPLICIT_GPR:
+        op->type = X86DEC_OPERAND_REG;
+        op->visibility = X86DEC_OPERAND_IMPLICIT;
+        if (is64) {
+          op->reg = gpr(context->fixed[i], 0);
+          op->size = 64;
+        } else {
+          op->reg = gpr(context->fixed[i], slot);
+          op->size = context->eosz;
+        }
+        break;
+      case X86DEC_SHAPE_IMPLICIT_GPR32:
+        op->type = X86DEC_OPERAND_REG;
+        op->visibility = X86DEC_OPERAND_IMPLICIT;
+        op->reg = gpr(context->fixed[i], 1);
+        op->size = 32;
+        break;
+      case X86DEC_SHAPE_IMPLICIT_ST0:
+        op->type = X86DEC_OPERAND_REG;
+        op->visibility = X86DEC_OPERAND_IMPLICIT;
+        op->reg = X86DEC_REG_ST0;
         op->size = 80;
         break;
       default:

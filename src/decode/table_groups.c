@@ -18,7 +18,7 @@ static const uint16_t x86dec_g1[8] = {
 };
 
 static const uint16_t x86dec_g2[8] = {
-  M(ROL), M(ROR), M(RCL), M(RCR), M(SHL), M(SHR), M(SAL), M(SAR)
+  M(ROL), M(ROR), M(RCL), M(RCR), M(SHL), M(SHR), M(SHL), M(SAR)
 };
 
 static const X86decGroup x86dec_g3b[8] = {
@@ -59,9 +59,9 @@ static const X86decGroup x86dec_g11v[8] = {
   Z0, Z0, Z0, Z0, Z0, Z0, Z0
 };
 
-static const X86decGroup x86dec_g6[8] = {
-  G0(M(SLDT), 1, S(GPR16_OR_MEM), S(NONE)),
-  G0(M(STR), 1, S(GPR16_OR_MEM), S(NONE)),
+  static const X86decGroup x86dec_g6[8] = {
+  G0(M(SLDT), 1, S(GPR_OR_MEM16), S(NONE)),
+  G0(M(STR), 1, S(GPR_OR_MEM16), S(NONE)),
   G0(M(LLDT), 1, S(GPR16_OR_MEM), S(NONE)),
   G0(M(LTR), 1, S(GPR16_OR_MEM), S(NONE)),
   G0(M(VERR), 1, S(GPR16_OR_MEM), S(NONE)),
@@ -146,7 +146,7 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
         if (fx & X86DEC_FX_F3) {
           out->mnemonic = M(PAUSE);
           out->count = 0;
-        } else if (!(fx & X86DEC_FX_REX) && eosz == 32) {
+        } else if (!(fx & X86DEC_FX_REXB)) {
           out->mnemonic = M(NOP);
           out->count = 0;
         }
@@ -156,6 +156,16 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
         break;
       case 0x99:
         out->mnemonic = eosz == 16 ? M(CWD) : eosz == 32 ? M(CDQ) : M(CQO);
+        break;
+      case 0x9C:
+        if (is64) {
+          out->mnemonic = M(PUSHFQ);
+        }
+        break;
+      case 0x9D:
+        if (is64) {
+          out->mnemonic = M(POPFQ);
+        }
         break;
       case 0x9A:
       case 0xEA:
@@ -210,7 +220,7 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
         }
         break;
       case 0xCF:
-        out->mnemonic = (is64 || eosz == 64) ? M(IRETQ)
+        out->mnemonic = eosz == 64 ? M(IRETQ)
             : eosz == 16 ? M(IRET) : M(IRETD);
         break;
       case 0xE3:
@@ -237,14 +247,14 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
           } else if (modrm == 0xFB) {
             out->mnemonic = M(ENDBR32);
             out->count = 0;
+          } else if (modrm >= 0xC8 && modrm <= 0xCF) {
+            out->mnemonic =
+                (fx & X86DEC_FX_REXW) ? M(RDSSPQ) : M(RDSSPD);
+            out->count = 1;
+            out->shapes[0] = S(GPR_REG);
           } else {
             return X86DEC_INVALID;
           }
-        }
-        break;
-      case 0xAF:
-        if (fx & X86DEC_FX_F3) {
-          return X86DEC_INVALID;
         }
         break;
       case 0xB8:
@@ -351,13 +361,28 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
         }
         break;
       case X86DEC_GROUP_7:
-        if (modrm == 0x3A) {
+        if (modrm == 0x3A && (fx & X86DEC_FX_F3)) {
           out->mnemonic = M(HRESET);
           out->count = 0;
           break;
         }
         if (mod == 3) {
           out->count = 0;
+
+          if (reg == 4) {
+            out->mnemonic = M(SMSW);
+            out->count = 1;
+            out->shapes[0] = S(GPR_OR_MEM16);
+            break;
+          }
+
+          if (reg == 6) {
+            out->mnemonic = M(LMSW);
+            out->count = 1;
+            out->shapes[0] = S(GPR_OR_MEM16);
+            break;
+          }
+
           switch (modrm) {
             case 0xC0:
               out->mnemonic = M(ENCLV);
@@ -403,51 +428,57 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
               break;
             case 0xD8:
               out->mnemonic = M(VMRUN);
+              out->count = 1;
+              out->shapes[0] = S(IMPLICIT_GPR);
               break;
             case 0xDA:
               out->mnemonic = M(VMLOAD);
+              out->count = 1;
+              out->shapes[0] = S(IMPLICIT_GPR);
               break;
             case 0xDB:
               out->mnemonic = M(VMSAVE);
+              out->count = 1;
+              out->shapes[0] = S(IMPLICIT_GPR);
               break;
             case 0xDD:
               out->mnemonic = M(CLGI);
               break;
             case 0xDE:
-              out->mnemonic = M(STGI);
+              out->mnemonic = M(SKINIT);
+              out->count = 1;
+              out->shapes[0] = S(IMPLICIT_GPR32);
               break;
             case 0xDF:
               out->mnemonic = M(INVLPGA);
+              out->count = 2;
+              out->shapes[0] = S(IMPLICIT_GPR);
+              out->shapes[1] = S(IMPLICIT_GPR32);
+              out->fixed[1] = 1;
               break;
-            case 0xE7:
-            case 0xE9:
             case 0xEA:
-            case 0xEB:
             case 0xEC:
             case 0xED:
             case 0xEE:
+            case 0xEF:
               if (!(fx & X86DEC_FX_F3)) {
                 return X86DEC_INVALID;
               }
-              if (modrm == 0xE7) {
-                out->mnemonic = M(SENDUIPI);
-              } else if (modrm == 0xE9) {
-                out->mnemonic = M(RDSSP);
-              } else if (modrm == 0xEA) {
+              if (modrm == 0xEA) {
                 out->mnemonic = M(SAVEPREVSSP);
-              } else if (modrm == 0xEB) {
-                out->mnemonic = M(RSTORSSP);
               } else if (modrm == 0xEC) {
                 out->mnemonic = M(UIRET);
               } else if (modrm == 0xED) {
                 out->mnemonic = M(TESTUI);
+              } else if (modrm == 0xEE) {
+                out->mnemonic = M(CLUI);
               } else {
                 out->mnemonic = M(STUI);
               }
               break;
             case 0xE8:
               if (fx & X86DEC_FX_F3) {
-                out->mnemonic = M(CLUI);
+                out->mnemonic = M(SETSSBSY);
               } else {
                 out->mnemonic = M(SERIALIZE);
               }
@@ -466,6 +497,8 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
               break;
             case 0xFC:
               out->mnemonic = M(CLZERO);
+              out->count = 1;
+              out->shapes[0] = S(IMPLICIT_GPR);
               break;
             case 0xFD:
               out->mnemonic = M(RDPRU);
@@ -494,11 +527,18 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
               break;
             case 4:
               out->mnemonic = M(SMSW);
-              out->shapes[0] = S(GPR16_OR_MEM);
+              out->shapes[0] = S(GPR_OR_MEM16);
+              break;
+            case 5:
+              if (!(fx & X86DEC_FX_F3)) {
+                return X86DEC_INVALID;
+              }
+              out->mnemonic = M(RSTORSSP);
+              out->shapes[0] = S(MEM64_RM);
               break;
             case 6:
               out->mnemonic = M(LMSW);
-              out->shapes[0] = S(GPR16_OR_MEM);
+              out->shapes[0] = S(GPR_OR_MEM16);
               break;
             case 7:
               out->mnemonic = M(INVLPG);
@@ -520,14 +560,35 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
         break;
       case X86DEC_GROUP_9:
         if (mod != 3) {
-          if (reg != 1) {
+          if (reg == 1 &&
+              !(fx & (X86DEC_FX_66 | X86DEC_FX_F3 | X86DEC_FX_F2))) {
+            out->mnemonic = eosz == 64 ? M(CMPXCHG16B) : M(CMPXCHG8B);
+            out->count = 1;
+            out->shapes[0] = S(MEM_RM);
+          } else if (reg == 6 &&
+              !(fx & (X86DEC_FX_66 | X86DEC_FX_F3 | X86DEC_FX_F2))) {
+            out->mnemonic = M(VMPTRLD);
+            out->count = 1;
+            out->shapes[0] = S(MEM64_RM);
+          } else if (reg == 6 && (fx & X86DEC_FX_66) &&
+              !(fx & (X86DEC_FX_F3 | X86DEC_FX_F2))) {
+            out->mnemonic = M(VMCLEAR);
+            out->count = 1;
+            out->shapes[0] = S(MEM64_RM);
+          } else if (reg == 6 && (fx & X86DEC_FX_F3)) {
+            out->mnemonic = M(VMXON);
+            out->count = 1;
+            out->shapes[0] = S(MEM64_RM);
+          } else if (reg == 7 &&
+              !(fx & (X86DEC_FX_66 | X86DEC_FX_F3 | X86DEC_FX_F2))) {
+            out->mnemonic = M(VMPTRST);
+            out->count = 1;
+            out->shapes[0] = S(MEM64_RM);
+          } else {
             return X86DEC_INVALID;
           }
-          out->mnemonic = eosz == 64 ? M(CMPXCHG16B) : M(CMPXCHG8B);
-          out->count = 1;
-          out->shapes[0] = S(MEM_RM);
         } else if (reg == 6) {
-          out->mnemonic = M(RDRAND);
+          out->mnemonic = (fx & X86DEC_FX_F3) ? M(SENDUIPI) : M(RDRAND);
           out->count = 1;
           out->shapes[0] = S(GPR_RM);
         } else if (reg == 7) {
@@ -543,16 +604,26 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
           return X86DEC_UNSUPPORTED;
         }
         if (mod == 3) {
-          out->count = 0;
-          if (reg == 5) {
+          if (reg == 5 && (fx & X86DEC_FX_F3)) {
+            out->mnemonic = (fx & X86DEC_FX_REXW) ? M(INCSSPQ) : M(INCSSPD);
+            out->count = 1;
+            out->shapes[0] = S(GPR_RM);
+          } else if (reg == 5) {
             out->mnemonic = M(LFENCE);
-          } else if (reg == 6) {
+            out->count = 0;
+          } else if (reg == 6 && !(fx & X86DEC_FX_F3)) {
             out->mnemonic = M(MFENCE);
-          } else if (reg == 7) {
+            out->count = 0;
+          } else if (reg == 7 && !(fx & X86DEC_FX_F3)) {
             out->mnemonic = M(SFENCE);
+            out->count = 0;
           } else {
             return X86DEC_INVALID;
           }
+        } else if (reg == 6 && (fx & X86DEC_FX_F3)) {
+          out->mnemonic = M(CLRSSBSY);
+          out->count = 1;
+          out->shapes[0] = S(MEM64_RM);
         } else {
           out->count = 1;
           switch (reg) {
@@ -583,8 +654,7 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
             default:
               return X86DEC_INVALID;
           }
-          out->shapes[0] = (reg == 2 || reg == 3) ? S(MEM_RM)
-              : reg == 7 ? S(MEM8_RM) : S(MEM_RM);
+          out->shapes[0] = S(MEM_RM);
         }
         break;
       case X86DEC_GROUP_0F18:
@@ -594,6 +664,7 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
           out->shapes[0] = S(MEM8_RM);
         } else {
           out->mnemonic = M(NOP);
+          out->count = 1;
           out->shapes[0] = S(GPR_OR_MEM);
         }
         break;
@@ -645,6 +716,10 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
     }
   }
 
+  if (map == 1 && opcode >= 0x20 && opcode <= 0x23) {
+    return X86DEC_OK;
+  }
+
   if (out->flags & X86DEC_ENTRY_MODRM) {
     for (i = 0; i < out->count; i++) {
       switch (out->shapes[i]) {
@@ -662,6 +737,9 @@ enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
         case S(GPR_RM):
         case S(GPR8_RM):
         case S(XMM_RM):
+        case S(XMM32):
+        case S(XMM64):
+        case S(MM32):
           if (mod != 3) {
             return X86DEC_INVALID;
           }

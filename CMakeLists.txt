@@ -27,6 +27,8 @@ endif()
 
 project(x86dec LANGUAGES C)
 
+option(X86DEC_UNITY_BUILD "Batch sources into unity files for faster code" ON)
+
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
@@ -43,6 +45,10 @@ file(GLOB_RECURSE HEADERS CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h")
 
 add_executable(x86dec ${SOURCES} ${HEADERS})
+
+if(X86DEC_UNITY_BUILD)
+  set_target_properties(x86dec PROPERTIES UNITY_BUILD ON)
+endif()
 
 target_include_directories(x86dec PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include/x86dec

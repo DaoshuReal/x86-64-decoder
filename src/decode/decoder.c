@@ -77,6 +77,8 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
   uint8_t b = 0;
   uint8_t i;
   uint8_t k;
+  X86decEntry synth = {0};
+  int use_synth = 0;
   enum x86dec_status_e st;
 
   if (!decoder || !buffer || !insn || !length) {
@@ -147,7 +149,22 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
     }
   }
 
-  if (is64 && !map && (opcode == 0xC4 || opcode == 0xC5 || opcode == 0x62)) {
+  if (is64 && !map && opcode == 0xC5 && cursor.left >= 2 &&
+      cursor.p[0] == 0xF8 && cursor.p[1] == 0x77) {
+    cursor.p += 2;
+    cursor.left -= 2;
+    cursor.pos += 2;
+    synth.mnemonic = X86DEC_MNEMONIC_VZEROUPPER;
+    use_synth = 1;
+  } else if (is64 && !map && opcode == 0xC4 && cursor.left >= 3 &&
+      cursor.p[0] == 0xE1 && cursor.p[1] == 0x7C && cursor.p[2] == 0xC0) {
+    cursor.p += 3;
+    cursor.left -= 3;
+    cursor.pos += 3;
+    synth.mnemonic = X86DEC_MNEMONIC_VZEROALL;
+    use_synth = 1;
+  } else if (is64 && !map &&
+      (opcode == 0xC4 || opcode == 0xC5 || opcode == 0x62)) {
     fill_error(insn, decoder, map, opcode, cursor.pos);
     return X86DEC_UNSUPPORTED;
   }
@@ -182,7 +199,9 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
     fx |= X86DEC_FX_REX;
   }
 
-  if (map >= 2) {
+  if (use_synth) {
+    resolved = synth;
+  } else if (map >= 2) {
     st = x86dec_scan_tail(&cursor, easz, &raw);
 
     if (st != X86DEC_OK) {
@@ -233,7 +252,6 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
       case X86DEC_MNEMONIC_CALL:
       case X86DEC_MNEMONIC_JMP:
       case X86DEC_MNEMONIC_RET:
-      case X86DEC_MNEMONIC_RETF:
       case X86DEC_MNEMONIC_ENTER:
       case X86DEC_MNEMONIC_LEAVE:
         eosz = 64;

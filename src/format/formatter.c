@@ -1,6 +1,6 @@
 #include "format/formatter.h"
 
-#include <stdio.h>
+#include <string.h>
 
 #include "core/mnemonic.h"
 #include "core/register.h"
@@ -41,7 +41,6 @@ static const char* const x86dec_mnemonic_texts[X86DEC_MNEMONIC_COUNT] = {
   [MN(DIV)] = "div",
   [MN(IDIV)] = "idiv",
   [MN(SHL)] = "shl",
-  [MN(SAL)] = "sal",
   [MN(SHR)] = "shr",
   [MN(SAR)] = "sar",
   [MN(ROL)] = "rol",
@@ -64,7 +63,7 @@ static const char* const x86dec_mnemonic_texts[X86DEC_MNEMONIC_COUNT] = {
   [MN(POPF)] = "popf",
   [MN(CALL)] = "call",
   [MN(RET)] = "ret",
-  [MN(RETF)] = "retf",
+  
   [MN(JMP)] = "jmp",
   [MN(JO)] = "jo",
   [MN(JNO)] = "jno",
@@ -81,7 +80,6 @@ static const char* const x86dec_mnemonic_texts[X86DEC_MNEMONIC_COUNT] = {
   [MN(JL)] = "jl",
   [MN(JNL)] = "jnl",
   [MN(JLE)] = "jle",
-  [MN(JG)] = "jg",
   [MN(LOOP)] = "loop",
   [MN(LOOPE)] = "loope",
   [MN(LOOPNE)] = "loopne",
@@ -103,7 +101,6 @@ static const char* const x86dec_mnemonic_texts[X86DEC_MNEMONIC_COUNT] = {
   [MN(SETL)] = "setl",
   [MN(SETNL)] = "setnl",
   [MN(SETLE)] = "setle",
-  [MN(SETG)] = "setg",
   [MN(CMOVO)] = "cmovo",
   [MN(CMOVNO)] = "cmovno",
   [MN(CMOVB)] = "cmovb",
@@ -119,7 +116,6 @@ static const char* const x86dec_mnemonic_texts[X86DEC_MNEMONIC_COUNT] = {
   [MN(CMOVL)] = "cmovl",
   [MN(CMOVNL)] = "cmovnl",
   [MN(CMOVLE)] = "cmovle",
-  [MN(CMOVG)] = "cmovg",
   [MN(INT)] = "int",
   [MN(INT1)] = "int1",
   [MN(INT3)] = "int3",
@@ -237,7 +233,6 @@ static const char* const x86dec_mnemonic_texts[X86DEC_MNEMONIC_COUNT] = {
   [MN(POPCNT)] = "popcnt",
   [MN(ENDBR64)] = "endbr64",
   [MN(ENDBR32)] = "endbr32",
-  [MN(WAIT)] = "wait",
   [MN(PUSHA)] = "pusha",
   [MN(PUSHAD)] = "pushad",
   [MN(POPA)] = "popa",
@@ -346,9 +341,6 @@ static const char* const x86dec_mnemonic_texts[X86DEC_MNEMONIC_COUNT] = {
   [MN(FCMOVNU)] = "fcmovnu",
   [MN(FNCLEX)] = "fnclex",
   [MN(FNINIT)] = "fninit",
-  [MN(FNENI)] = "fneni",
-  [MN(FNDISI)] = "fndisi",
-  [MN(FNSETPM)] = "fnsetpm",
   [MN(FFREE)] = "ffree",
   [MN(FFREEP)] = "ffreep",
   [MN(PI2FW)] = "pi2fw",
@@ -395,7 +387,6 @@ static const char* const x86dec_mnemonic_texts[X86DEC_MNEMONIC_COUNT] = {
   [MN(TESTUI)] = "testui",
   [MN(UIRET)] = "uiret",
   [MN(SENDUIPI)] = "senduipi",
-  [MN(RDSSP)] = "rdssp",
   [MN(SAVEPREVSSP)] = "saveprevssp",
   [MN(RSTORSSP)] = "rstorssp",
   [MN(WRMSRNS)] = "wrmsrns",
@@ -591,7 +582,49 @@ static const char* const x86dec_mnemonic_texts[X86DEC_MNEMONIC_COUNT] = {
   [MN(HSUBPS)] = "hsubps",
   [MN(HSUBPD)] = "hsubpd",
   [MN(ADDSUBPS)] = "addsubps",
-  [MN(ADDSUBPD)] = "addsubpd"
+  [MN(ADDSUBPD)] = "addsubpd",
+  [MN(PUSHFQ)] = "pushfq",
+  [MN(POPFQ)] = "popfq",
+  [MN(FSTPNCE)] = "fstpnce",
+  [MN(SKINIT)] = "skinit",
+  [MN(SETSSBSY)] = "setssbsy",
+  [MN(INCSSPD)] = "incsspd",
+  [MN(INCSSPQ)] = "incsspq",
+  [MN(CLRSSBSY)] = "clrssbsy",
+  [MN(WRSSD)] = "wrssd",
+  [MN(WRSSQ)] = "wrssq",
+  [MN(WRUSSD)] = "wrussd",
+  [MN(WRUSSQ)] = "wrussq",
+  [MN(PSHUFB)] = "pshufb",
+  [MN(PHADDW)] = "phaddw",
+  [MN(PHADDD)] = "phaddd",
+  [MN(PHADDSW)] = "phaddsw",
+  [MN(PHSUBW)] = "phsubw",
+  [MN(PHSUBD)] = "phsubd",
+  [MN(PHSUBSW)] = "phsubsw",
+  [MN(PSIGNB)] = "psignb",
+  [MN(PSIGNW)] = "psignw",
+  [MN(PSIGND)] = "psignd",
+  [MN(PMULHRSW)] = "pmulhrsw",
+  [MN(PABSB)] = "pabsb",
+  [MN(PABSW)] = "pabsw",
+  [MN(PABSD)] = "pabsd",
+  [MN(PALIGNR)] = "palignr",
+  [MN(VMPTRLD)] = "vmptrld",
+  [MN(VMCLEAR)] = "vmclear",
+  [MN(VMXON)] = "vmxon",
+  [MN(VMPTRST)] = "vmptrst",
+  [MN(VZEROUPPER)] = "vzeroupper",
+  [MN(VZEROALL)] = "vzeroall",
+  [MN(JNLE)] = "jnle",
+  [MN(SETNLE)] = "setnle",
+  [MN(CMOVNLE)] = "cmovnle",
+  [MN(FWAIT)] = "fwait",
+  [MN(FENI8087_NOP)] = "feni8087_nop",
+  [MN(FDISI8087_NOP)] = "fdisi8087_nop",
+  [MN(FSETPM287_NOP)] = "fsetpm287_nop",
+  [MN(RDSSPD)] = "rdsspd",
+  [MN(RDSSPQ)] = "rdsspq"
 };
 
 static const char* const x86dec_register_texts[X86DEC_REG_COUNT] = {
@@ -733,65 +766,136 @@ static const char* const x86dec_register_texts[X86DEC_REG_COUNT] = {
 
 const char* x86dec_mnemonic_text(enum x86dec_mnemonic_e mnemonic)
 {
+  const char* text;
+
   if ((unsigned)mnemonic >= X86DEC_MNEMONIC_COUNT) {
     return "invalid";
   }
 
-  return x86dec_mnemonic_texts[mnemonic];
+  text = x86dec_mnemonic_texts[mnemonic];
+
+  return text ? text : "invalid";
 }
 
 const char* x86dec_register_text(enum x86dec_register_e reg)
 {
+  const char* text;
+
   if ((unsigned)reg >= X86DEC_REG_COUNT) {
     return "none";
   }
 
-  return x86dec_register_texts[reg];
+  text = x86dec_register_texts[reg];
+
+  return text ? text : "none";
+}
+
+static char* emit_text(char* cursor, char* end, const char* text)
+{
+  size_t len = strlen(text);
+
+  if ((size_t)(end - cursor) < len) {
+    return 0;
+  }
+
+  memcpy(cursor, text, len);
+
+  return cursor + len;
+}
+
+static char* emit_char(char* cursor, char* end, char value)
+{
+  if (cursor >= end) {
+    return 0;
+  }
+
+  *cursor++ = value;
+
+  return cursor;
+}
+
+static char* emit_hex(char* cursor, char* end, unsigned long long value)
+{
+  static const char digits[16] = {
+    '0', '1', '2', '3', '4', '5', '6', '7',
+    '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+  };
+  int shift = 60;
+
+  if ((size_t)(end - cursor) < 3) {
+    return 0;
+  }
+
+  *cursor++ = '0';
+  *cursor++ = 'x';
+
+  while (shift > 0 && ((value >> shift) & 0xF) == 0) {
+    shift -= 4;
+  }
+
+  for (;;) {
+    if (cursor >= end) {
+      return 0;
+    }
+
+    *cursor++ = digits[(value >> shift) & 0xF];
+
+    if (!shift) {
+      break;
+    }
+
+    shift -= 4;
+  }
+
+  return cursor;
 }
 
 bool x86dec_format_insn(const X86decInsn* insn,
     const X86decOperand* operands, char* buffer, size_t size)
 {
-  char* cursor = buffer;
-  size_t remaining = size;
-  int written;
+  char* cursor;
+  char* end;
   uint8_t i;
 
   if (!insn || !buffer || !size) {
     return false;
   }
 
-#define X86DEC_EMIT(...) do { written = snprintf(cursor, remaining, __VA_ARGS__); \
-    if (written < 0 || (size_t)written >= remaining) { return false; } \
-    cursor += written; remaining -= (size_t)written; } while (0)
+  cursor = buffer;
+  end = buffer + size - 1;
+
+#define X86DEC_PUT(call) do { cursor = (call); if (!cursor) { return false; } } while (0)
+
   if (insn->flags & X86DEC_INSN_HAS_LOCK) {
-    X86DEC_EMIT("lock ");
+    X86DEC_PUT(emit_text(cursor, end, "lock "));
   }
 
   if ((insn->flags & X86DEC_INSN_HAS_REP) &&
       insn->mnemonic != X86DEC_MNEMONIC_PAUSE) {
-    X86DEC_EMIT("rep ");
+    X86DEC_PUT(emit_text(cursor, end, "rep "));
   }
 
   if (insn->flags & X86DEC_INSN_HAS_REPNE) {
-    X86DEC_EMIT("repne ");
+    X86DEC_PUT(emit_text(cursor, end, "repne "));
   }
 
-  X86DEC_EMIT("%s", x86dec_mnemonic_text(insn->mnemonic));
+  X86DEC_PUT(emit_text(cursor, end, x86dec_mnemonic_text(insn->mnemonic)));
 
   if (operands) {
     for (i = 0; i < insn->operand_count; i++) {
       const X86decOperand* op = &operands[i];
 
-      X86DEC_EMIT(i ? ", " : " ");
+      X86DEC_PUT(emit_text(cursor, end, i ? ", " : " "));
 
       switch (op->type) {
         case X86DEC_OPERAND_REG:
-          X86DEC_EMIT("%s", x86dec_register_text(op->reg));
+          X86DEC_PUT(emit_text(cursor, end, x86dec_register_text(op->reg)));
           break;
+
         case X86DEC_OPERAND_IMM:
-          X86DEC_EMIT("0x%llx", (unsigned long long)op->imm.value);
+          X86DEC_PUT(emit_hex(cursor, end, op->imm.value));
           break;
+
         case X86DEC_OPERAND_MEM: {
           const char* size_text = 0;
           unsigned long long magnitude;
@@ -821,26 +925,36 @@ bool x86dec_format_insn(const X86decInsn* insn,
           }
 
           if (size_text) {
-            X86DEC_EMIT("%s", size_text);
+            X86DEC_PUT(emit_text(cursor, end, size_text));
           }
 
-          if (op->mem.segment != X86DEC_REG_NONE) {
-            X86DEC_EMIT("%s:", x86dec_register_text(op->mem.segment));
+          if (op->mem.segment != X86DEC_REG_NONE &&
+              !(op->mem.base == X86DEC_REG_RIP &&
+                  op->mem.segment == X86DEC_REG_DS)) {
+            X86DEC_PUT(emit_text(cursor, end,
+                x86dec_register_text(op->mem.segment)));
+            X86DEC_PUT(emit_char(cursor, end, ':'));
           }
 
-          X86DEC_EMIT("[");
+          X86DEC_PUT(emit_char(cursor, end, '['));
 
           if (op->mem.base != X86DEC_REG_NONE) {
-            X86DEC_EMIT("%s", x86dec_register_text(op->mem.base));
+            X86DEC_PUT(emit_text(cursor, end,
+                x86dec_register_text(op->mem.base)));
             is_first = 0;
           }
 
           if (op->mem.index != X86DEC_REG_NONE) {
-            X86DEC_EMIT(is_first ? "%s" : "+%s",
-                x86dec_register_text(op->mem.index));
+            if (!is_first) {
+              X86DEC_PUT(emit_char(cursor, end, '+'));
+            }
+
+            X86DEC_PUT(emit_text(cursor, end,
+                x86dec_register_text(op->mem.index)));
 
             if (op->mem.scale > 1) {
-              X86DEC_EMIT("*%u", op->mem.scale);
+              X86DEC_PUT(emit_char(cursor, end, '*'));
+              X86DEC_PUT(emit_char(cursor, end, (char)('0' + op->mem.scale)));
             }
 
             is_first = 0;
@@ -851,23 +965,26 @@ bool x86dec_format_insn(const X86decInsn* insn,
               : (unsigned long long)op->mem.disp;
 
           if (op->mem.has_disp || is_first) {
-            if (is_first) {
-              X86DEC_EMIT(op->mem.disp < 0 ? "-0x%llx" : "0x%llx", magnitude);
-            } else {
-              X86DEC_EMIT(op->mem.disp < 0 ? "-0x%llx" : "+0x%llx", magnitude);
+            if (!is_first || op->mem.disp < 0) {
+              X86DEC_PUT(emit_char(cursor, end,
+                  op->mem.disp < 0 ? '-' : '+'));
             }
+
+            X86DEC_PUT(emit_hex(cursor, end, magnitude));
           }
 
-          X86DEC_EMIT("]");
+          X86DEC_PUT(emit_char(cursor, end, ']'));
           break;
         }
         default:
-          X86DEC_EMIT("?");
+          X86DEC_PUT(emit_char(cursor, end, '?'));
           break;
       }
     }
   }
 
+  *cursor = 0;
+
   return true;
-#undef X86DEC_EMIT
+#undef X86DEC_PUT
 }

@@ -66,22 +66,10 @@ const X86decSseEntry x86dec_sse_mov[256] = {
   .variant_f3 = NOVAR,
   .variant_f2 = NOVAR,
 },
-[0x6E] = {
-  .base = V(M(MOVD), 2, S(XMM_REG), S(R32_OR_MEM), S(NONE), 0),
-  .variant_66 = V(M(MOVQ), 2, S(XMM_REG), S(GPR_OR_MEM), S(NONE), 64),
-  .variant_f3 = NOVAR,
-  .variant_f2 = NOVAR,
-},
 [0x6F] = {
   .base = V(M(MOVQ), 2, S(MM_REG), S(MM_OR_MEM), S(NONE), 0),
   .variant_66 = V(M(MOVDQA), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 0),
   .variant_f3 = V(M(MOVDQU), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 0),
-  .variant_f2 = NOVAR,
-},
-[0x7E] = {
-  .base = V(M(MOVD), 2, S(R32_OR_MEM), S(XMM_REG), S(NONE), 0),
-  .variant_66 = V(M(MOVQ), 2, S(GPR_OR_MEM), S(XMM_REG), S(NONE), 64),
-  .variant_f3 = NOVAR,
   .variant_f2 = NOVAR,
 },
 [0x7F] = {
@@ -121,8 +109,8 @@ const X86decSseEntry x86dec_sse_mov[256] = {
   .variant_f2 = V(M(LDDQU), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 0),
 },
 [0xF7] = {
-  .base = V(M(MASKMOVQ), 0, S(NONE), S(NONE), S(NONE), 0),
-  .variant_66 = V(M(MASKMOVDQU), 0, S(NONE), S(NONE), S(NONE), 0),
+  .base = V(M(MASKMOVQ), 2, S(MM_REG), S(MM_OR_MEM), S(NONE), 0),
+  .variant_66 = V(M(MASKMOVDQU), 2, S(XMM_REG), S(XMM_OR_MEM), S(NONE), 0),
   .variant_f3 = NOVAR,
   .variant_f2 = NOVAR,
 }

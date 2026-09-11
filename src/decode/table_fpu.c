@@ -3,7 +3,7 @@
 #define M(x) X86DEC_MNEMONIC_##x
 #define S(x) X86DEC_SHAPE_##x
 
-static void fill_mem(X86decEntry* out, uint16_t mnemonic, uint8_t shape)
+static void fpu_fill_mem(X86decEntry* out, uint16_t mnemonic, uint8_t shape)
 {
   out->mnemonic = mnemonic;
   out->count = 1;
@@ -12,7 +12,7 @@ static void fill_mem(X86decEntry* out, uint16_t mnemonic, uint8_t shape)
   out->shapes[2] = S(NONE);
 }
 
-static void fill_none(X86decEntry* out, uint16_t mnemonic)
+static void fpu_fill_none(X86decEntry* out, uint16_t mnemonic)
 {
   out->mnemonic = mnemonic;
   out->count = 0;
@@ -21,7 +21,7 @@ static void fill_none(X86decEntry* out, uint16_t mnemonic)
   out->shapes[2] = S(NONE);
 }
 
-static void fill_pair(X86decEntry* out, uint16_t mnemonic)
+static void fpu_fill_pair(X86decEntry* out, uint16_t mnemonic)
 {
   out->mnemonic = mnemonic;
   out->count = 2;
@@ -30,7 +30,7 @@ static void fill_pair(X86decEntry* out, uint16_t mnemonic)
   out->shapes[2] = S(NONE);
 }
 
-static void fill_st(X86decEntry* out, uint16_t mnemonic)
+static void fpu_fill_st(X86decEntry* out, uint16_t mnemonic)
 {
   out->mnemonic = mnemonic;
   out->count = 1;
@@ -39,7 +39,7 @@ static void fill_st(X86decEntry* out, uint16_t mnemonic)
   out->shapes[2] = S(NONE);
 }
 
-static void fill_fixed_st(X86decEntry* out, uint16_t mnemonic, uint8_t index)
+static void fpu_fill_fixed_st(X86decEntry* out, uint16_t mnemonic, uint8_t index)
 {
   out->mnemonic = mnemonic;
   out->count = 1;
@@ -57,16 +57,16 @@ static enum x86dec_status_e resolve_d8(uint8_t modrm, X86decEntry* out)
   uint8_t reg = (uint8_t)((modrm >> 3) & 7);
 
   if ((modrm >> 6) != 3) {
-    fill_mem(out, arith[reg], S(MEM32_RM));
+    fpu_fill_mem(out, arith[reg], S(MEM32_RM));
     return X86DEC_OK;
   }
 
   if (reg == 2 || reg == 3) {
-    fill_st(out, arith[reg]);
+    fpu_fill_st(out, arith[reg]);
     return X86DEC_OK;
   }
 
-  fill_pair(out, arith[reg]);
+  fpu_fill_pair(out, arith[reg]);
   return X86DEC_OK;
 }
 
@@ -86,109 +86,109 @@ static enum x86dec_status_e resolve_d9(uint8_t modrm, X86decEntry* out)
       return X86DEC_INVALID;
     }
 
-    fill_mem(out, mem[reg], shapes[reg]);
+    fpu_fill_mem(out, mem[reg], shapes[reg]);
     return X86DEC_OK;
   }
 
   if (modrm >= 0xC0 && modrm <= 0xC7) {
-    fill_st(out, M(FLD));
+    fpu_fill_st(out, M(FLD));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xC8 && modrm <= 0xCF) {
-    fill_st(out, M(FXCH));
+    fpu_fill_st(out, M(FXCH));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xD8 && modrm <= 0xDF) {
-    fill_fixed_st(out, M(FSTP), 1);
+    fpu_fill_st(out, M(FSTPNCE));
     return X86DEC_OK;
   }
 
   switch (modrm) {
     case 0xD0:
-      fill_none(out, M(FNOP));
+      fpu_fill_none(out, M(FNOP));
       return X86DEC_OK;
     case 0xE0:
-      fill_none(out, M(FCHS));
+      fpu_fill_none(out, M(FCHS));
       return X86DEC_OK;
     case 0xE1:
-      fill_none(out, M(FABS));
+      fpu_fill_none(out, M(FABS));
       return X86DEC_OK;
     case 0xE4:
-      fill_none(out, M(FTST));
+      fpu_fill_none(out, M(FTST));
       return X86DEC_OK;
     case 0xE5:
-      fill_none(out, M(FXAM));
+      fpu_fill_none(out, M(FXAM));
       return X86DEC_OK;
     case 0xE8:
-      fill_none(out, M(FLD1));
+      fpu_fill_none(out, M(FLD1));
       return X86DEC_OK;
     case 0xE9:
-      fill_none(out, M(FLDL2T));
+      fpu_fill_none(out, M(FLDL2T));
       return X86DEC_OK;
     case 0xEA:
-      fill_none(out, M(FLDL2E));
+      fpu_fill_none(out, M(FLDL2E));
       return X86DEC_OK;
     case 0xEB:
-      fill_none(out, M(FLDPI));
+      fpu_fill_none(out, M(FLDPI));
       return X86DEC_OK;
     case 0xEC:
-      fill_none(out, M(FLDLG2));
+      fpu_fill_none(out, M(FLDLG2));
       return X86DEC_OK;
     case 0xED:
-      fill_none(out, M(FLDLN2));
+      fpu_fill_none(out, M(FLDLN2));
       return X86DEC_OK;
     case 0xEE:
-      fill_none(out, M(FLDZ));
+      fpu_fill_none(out, M(FLDZ));
       return X86DEC_OK;
     case 0xF0:
-      fill_none(out, M(F2XM1));
+      fpu_fill_none(out, M(F2XM1));
       return X86DEC_OK;
     case 0xF1:
-      fill_none(out, M(FYL2X));
+      fpu_fill_none(out, M(FYL2X));
       return X86DEC_OK;
     case 0xF2:
-      fill_none(out, M(FPTAN));
+      fpu_fill_none(out, M(FPTAN));
       return X86DEC_OK;
     case 0xF3:
-      fill_none(out, M(FPATN));
+      fpu_fill_none(out, M(FPATN));
       return X86DEC_OK;
     case 0xF4:
-      fill_none(out, M(FXTRACT));
+      fpu_fill_none(out, M(FXTRACT));
       return X86DEC_OK;
     case 0xF5:
-      fill_none(out, M(FPREM1));
+      fpu_fill_none(out, M(FPREM1));
       return X86DEC_OK;
     case 0xF6:
-      fill_none(out, M(FDECSTP));
+      fpu_fill_none(out, M(FDECSTP));
       return X86DEC_OK;
     case 0xF7:
-      fill_none(out, M(FINCSTP));
+      fpu_fill_none(out, M(FINCSTP));
       return X86DEC_OK;
     case 0xF8:
-      fill_none(out, M(FPREM));
+      fpu_fill_none(out, M(FPREM));
       return X86DEC_OK;
     case 0xF9:
-      fill_none(out, M(FYL2XP1));
+      fpu_fill_none(out, M(FYL2XP1));
       return X86DEC_OK;
     case 0xFA:
-      fill_none(out, M(FSQRT));
+      fpu_fill_none(out, M(FSQRT));
       return X86DEC_OK;
     case 0xFB:
-      fill_none(out, M(FSINCOS));
+      fpu_fill_none(out, M(FSINCOS));
       return X86DEC_OK;
     case 0xFC:
-      fill_none(out, M(FRNDINT));
+      fpu_fill_none(out, M(FRNDINT));
       return X86DEC_OK;
     case 0xFD:
-      fill_none(out, M(FSCALE));
+      fpu_fill_none(out, M(FSCALE));
       return X86DEC_OK;
     case 0xFE:
-      fill_none(out, M(FSIN));
+      fpu_fill_none(out, M(FSIN));
       return X86DEC_OK;
     case 0xFF:
-      fill_none(out, M(FCOS));
+      fpu_fill_none(out, M(FCOS));
       return X86DEC_OK;
     default:
       return X86DEC_INVALID;
@@ -204,32 +204,32 @@ static enum x86dec_status_e resolve_da(uint8_t modrm, X86decEntry* out)
   uint8_t reg = (uint8_t)((modrm >> 3) & 7);
 
   if ((modrm >> 6) != 3) {
-    fill_mem(out, fimem[reg], S(MEM32_RM));
+    fpu_fill_mem(out, fimem[reg], S(MEM32_RM));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xC0 && modrm <= 0xC7) {
-    fill_pair(out, M(FCMOVB));
+    fpu_fill_pair(out, M(FCMOVB));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xC8 && modrm <= 0xCF) {
-    fill_pair(out, M(FCMOVE));
+    fpu_fill_pair(out, M(FCMOVE));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xD0 && modrm <= 0xD7) {
-    fill_pair(out, M(FCMOVBE));
+    fpu_fill_pair(out, M(FCMOVBE));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xD8 && modrm <= 0xDF) {
-    fill_pair(out, M(FCMOVU));
+    fpu_fill_pair(out, M(FCMOVU));
     return X86DEC_OK;
   }
 
   if (modrm == 0xE9) {
-    fill_none(out, M(FUCOMPP));
+    fpu_fill_none(out, M(FUCOMPP));
     return X86DEC_OK;
   }
 
@@ -252,55 +252,55 @@ static enum x86dec_status_e resolve_db(uint8_t modrm, X86decEntry* out)
       return X86DEC_INVALID;
     }
 
-    fill_mem(out, mem[reg], shapes[reg]);
+    fpu_fill_mem(out, mem[reg], shapes[reg]);
     return X86DEC_OK;
   }
 
   if (modrm >= 0xC0 && modrm <= 0xC7) {
-    fill_pair(out, M(FCMOVNB));
+    fpu_fill_pair(out, M(FCMOVNB));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xC8 && modrm <= 0xCF) {
-    fill_pair(out, M(FCMOVNE));
+    fpu_fill_pair(out, M(FCMOVNE));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xD0 && modrm <= 0xD7) {
-    fill_pair(out, M(FCMOVNBE));
+    fpu_fill_pair(out, M(FCMOVNBE));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xD8 && modrm <= 0xDF) {
-    fill_pair(out, M(FCMOVNU));
+    fpu_fill_pair(out, M(FCMOVNU));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xE8 && modrm <= 0xEF) {
-    fill_pair(out, M(FUCOMI));
+    fpu_fill_pair(out, M(FUCOMI));
     return X86DEC_OK;
   }
 
   if (modrm >= 0xF0 && modrm <= 0xF7) {
-    fill_pair(out, M(FCOMI));
+    fpu_fill_pair(out, M(FCOMI));
     return X86DEC_OK;
   }
 
   switch (modrm) {
     case 0xE0:
-      fill_none(out, M(FNENI));
+      fpu_fill_none(out, M(FENI8087_NOP));
       return X86DEC_OK;
     case 0xE1:
-      fill_none(out, M(FNDISI));
+      fpu_fill_none(out, M(FDISI8087_NOP));
       return X86DEC_OK;
     case 0xE2:
-      fill_none(out, M(FNCLEX));
+      fpu_fill_none(out, M(FNCLEX));
       return X86DEC_OK;
     case 0xE3:
-      fill_none(out, M(FNINIT));
+      fpu_fill_none(out, M(FNINIT));
       return X86DEC_OK;
     case 0xE4:
-      fill_none(out, M(FNSETPM));
+      fpu_fill_none(out, M(FSETPM287_NOP));
       return X86DEC_OK;
     default:
       return X86DEC_INVALID;

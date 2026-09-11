@@ -3,7 +3,7 @@
 #define M(x) X86DEC_MNEMONIC_##x
 #define S(x) X86DEC_SHAPE_##x
 
-static void fill_xmm(X86decEntry* out, uint16_t mnemonic)
+static void crypto_fill_xmm(X86decEntry* out, uint16_t mnemonic)
 {
   out->mnemonic = mnemonic;
   out->count = 2;
@@ -12,7 +12,7 @@ static void fill_xmm(X86decEntry* out, uint16_t mnemonic)
   out->shapes[2] = S(NONE);
 }
 
-static void fill_xmm_imm(X86decEntry* out, uint16_t mnemonic)
+static void crypto_fill_xmm_imm(X86decEntry* out, uint16_t mnemonic)
 {
   out->mnemonic = mnemonic;
   out->count = 3;
@@ -37,20 +37,21 @@ static enum x86dec_status_e resolve_38(uint8_t opcode, uint16_t fx,
         return X86DEC_INVALID;
       }
       if (opcode == 0xDB) {
-        fill_xmm(out, M(AESIMC));
+        crypto_fill_xmm(out, M(AESIMC));
       } else if (opcode == 0xDC) {
-        fill_xmm(out, M(AESENC));
+        crypto_fill_xmm(out, M(AESENC));
       } else if (opcode == 0xDD) {
-        fill_xmm(out, M(AESENCLAST));
+        crypto_fill_xmm(out, M(AESENCLAST));
       } else if (opcode == 0xDE) {
-        fill_xmm(out, M(AESDEC));
+        crypto_fill_xmm(out, M(AESDEC));
       } else {
-        fill_xmm(out, M(AESDECLAST));
+        crypto_fill_xmm(out, M(AESDECLAST));
       }
       return X86DEC_OK;
     case 0xC8:
     case 0xC9:
     case 0xCA:
+    case 0xCB:
     case 0xCC:
     case 0xCD:
     case 0xCE:
@@ -58,24 +59,94 @@ static enum x86dec_status_e resolve_38(uint8_t opcode, uint16_t fx,
         return X86DEC_INVALID;
       }
       if (opcode == 0xC8) {
-        fill_xmm(out, M(SHA1NEXTE));
+        crypto_fill_xmm(out, M(SHA1NEXTE));
       } else if (opcode == 0xC9) {
-        fill_xmm(out, M(SHA1MSG1));
+        crypto_fill_xmm(out, M(SHA1MSG1));
       } else if (opcode == 0xCA) {
-        fill_xmm(out, M(SHA1MSG2));
+        crypto_fill_xmm(out, M(SHA1MSG2));
+      } else if (opcode == 0xCB) {
+        crypto_fill_xmm(out, M(SHA256RNDS2));
       } else if (opcode == 0xCC) {
-        fill_xmm(out, M(SHA256RNDS2));
-      } else if (opcode == 0xCD) {
-        fill_xmm(out, M(SHA256MSG1));
+        crypto_fill_xmm(out, M(SHA256MSG1));
       } else {
-        fill_xmm(out, M(SHA256MSG2));
+        crypto_fill_xmm(out, M(SHA256MSG2));
       }
       return X86DEC_OK;
-    case 0xCB:
+    case 0x00:
+    case 0x01:
+    case 0x02:
+    case 0x03:
+    case 0x05:
+    case 0x06:
+    case 0x07:
+    case 0x08:
+    case 0x09:
+    case 0x0A:
+    case 0x0B:
+    case 0x1C:
+    case 0x1D:
+    case 0x1E:
+      if (has_simd_prefix) {
+        return X86DEC_INVALID;
+      }
+      if (opcode == 0x00) {
+        out->mnemonic = M(PSHUFB);
+      } else if (opcode == 0x01) {
+        out->mnemonic = M(PHADDW);
+      } else if (opcode == 0x02) {
+        out->mnemonic = M(PHADDD);
+      } else if (opcode == 0x03) {
+        out->mnemonic = M(PHADDSW);
+      } else if (opcode == 0x05) {
+        out->mnemonic = M(PHSUBW);
+      } else if (opcode == 0x06) {
+        out->mnemonic = M(PHSUBD);
+      } else if (opcode == 0x07) {
+        out->mnemonic = M(PHSUBSW);
+      } else if (opcode == 0x08) {
+        out->mnemonic = M(PSIGNB);
+      } else if (opcode == 0x09) {
+        out->mnemonic = M(PSIGNW);
+      } else if (opcode == 0x0A) {
+        out->mnemonic = M(PSIGND);
+      } else if (opcode == 0x0B) {
+        out->mnemonic = M(PMULHRSW);
+      } else if (opcode == 0x1C) {
+        out->mnemonic = M(PABSB);
+      } else if (opcode == 0x1D) {
+        out->mnemonic = M(PABSW);
+      } else {
+        out->mnemonic = M(PABSD);
+      }
+      out->count = 2;
+      if (has_66) {
+        out->shapes[0] = S(XMM_REG);
+        out->shapes[1] = S(XMM_OR_MEM);
+      } else {
+        out->shapes[0] = S(MM_REG);
+        out->shapes[1] = S(MM_OR_MEM);
+      }
+      out->shapes[2] = S(NONE);
+      return X86DEC_OK;
+    case 0xF5:
+      if (!has_66 || has_simd_prefix) {
+        return X86DEC_INVALID;
+      }
+      out->mnemonic = (fx & X86DEC_FX_REXW) ? M(WRUSSQ) : M(WRUSSD);
+      out->count = 2;
+      out->shapes[0] = S(GPR_OR_MEM);
+      out->shapes[1] = S(GPR_REG);
+      out->shapes[2] = S(NONE);
+      return X86DEC_OK;
+    case 0xF6:
       if (has_66 || has_simd_prefix) {
         return X86DEC_INVALID;
       }
-      fill_xmm_imm(out, M(SHA1RNDS4));
+      out->mnemonic = (fx & X86DEC_FX_REXW) ? M(WRSSQ) : M(WRSSD);
+      out->count = 2;
+      out->shapes[0] = S(GPR_OR_MEM);
+      out->shapes[1] = S(GPR_REG);
+      out->shapes[2] = S(NONE);
       return X86DEC_OK;
     case 0xF0:
     case 0xF1:
@@ -99,6 +170,35 @@ static enum x86dec_status_e resolve_3a(uint8_t opcode, uint16_t fx,
   int has_66 = (fx & X86DEC_FX_66) != 0;
   int has_simd_prefix = (fx & (X86DEC_FX_F3 | X86DEC_FX_F2)) != 0;
 
+  if (opcode == 0xCC) {
+    if (has_66 || has_simd_prefix) {
+      return X86DEC_INVALID;
+    }
+
+    crypto_fill_xmm_imm(out, M(SHA1RNDS4));
+    return X86DEC_OK;
+  }
+
+  if (opcode == 0x0F) {
+    if (has_simd_prefix) {
+      return X86DEC_INVALID;
+    }
+
+    out->mnemonic = M(PALIGNR);
+    out->count = 3;
+
+    if (has_66) {
+      out->shapes[0] = S(XMM_REG);
+      out->shapes[1] = S(XMM_OR_MEM);
+    } else {
+      out->shapes[0] = S(MM_REG);
+      out->shapes[1] = S(MM_OR_MEM);
+    }
+
+    out->shapes[2] = S(IMM8);
+    return X86DEC_OK;
+  }
+
   if (!has_66 || has_simd_prefix) {
     if (opcode == 0x44 || opcode == 0xDF) {
       return X86DEC_INVALID;
@@ -107,12 +207,12 @@ static enum x86dec_status_e resolve_3a(uint8_t opcode, uint16_t fx,
   }
 
   if (opcode == 0x44) {
-    fill_xmm_imm(out, M(PCLMULQDQ));
+    crypto_fill_xmm_imm(out, M(PCLMULQDQ));
     return X86DEC_OK;
   }
 
   if (opcode == 0xDF) {
-    fill_xmm_imm(out, M(AESKEYGENASSIST));
+    crypto_fill_xmm_imm(out, M(AESKEYGENASSIST));
     return X86DEC_OK;
   }
 
