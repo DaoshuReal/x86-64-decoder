@@ -7,6 +7,7 @@ uint8_t x86dec_default_eosz(const X86decDecoder* decoder)
   if (decoder->width == X86DEC_STACK_16) {
     return 16;
   }
+
   return 32;
 }
 
@@ -15,17 +16,21 @@ uint8_t x86dec_default_easz(const X86decDecoder* decoder)
   if (decoder->mode == X86DEC_MODE_LONG_64) {
     return 64;
   }
+
   return x86dec_default_eosz(decoder);
 }
 
-enum x86dec_status_e x86dec_scan_prefixes(X86decCursor* c, X86decRaw* raw)
+enum x86dec_status_e x86dec_scan_prefixes(X86decCursor* cursor, X86decRaw* raw)
 {
   for (;;) {
     uint8_t b;
-    if (!c->left || raw->count >= 8) {
+
+    if (!cursor->left || raw->count >= 8) {
       return X86DEC_OK;
     }
-    b = *c->p;
+
+    b = *cursor->p;
+
     switch (b) {
       case 0xF0:
         raw->lock = true;
@@ -63,9 +68,11 @@ enum x86dec_status_e x86dec_scan_prefixes(X86decCursor* c, X86decRaw* raw)
       default:
         return X86DEC_OK;
     }
+
     raw->bytes[raw->count++] = b;
-    c->p++;
-    c->left--;
-    c->pos++;
+
+    cursor->p++;
+    cursor->left--;
+    cursor->pos++;
   }
 }

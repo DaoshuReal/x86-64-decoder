@@ -87,6 +87,7 @@ typedef struct {
   uint8_t opcode;
   uint8_t map;
   uint16_t flags;
+  uint16_t mem_bits;
 } X86decContext;
 
 bool x86dec_decoder_init(X86decDecoder* decoder,

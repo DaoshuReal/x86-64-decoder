@@ -34,7 +34,21 @@ enum x86dec_shape_e {
   X86DEC_SHAPE_IMM_ONE,
   X86DEC_SHAPE_REL8,
   X86DEC_SHAPE_REL_V,
-  X86DEC_SHAPE_MOFFS
+  X86DEC_SHAPE_MOFFS,
+  X86DEC_SHAPE_ST_REG,
+  X86DEC_SHAPE_FIXED_ST0,
+  X86DEC_SHAPE_FIXED_ST,
+  X86DEC_SHAPE_MM_REG,
+  X86DEC_SHAPE_MM_OR_MEM,
+  X86DEC_SHAPE_XMM_REG,
+  X86DEC_SHAPE_XMM_RM,
+  X86DEC_SHAPE_XMM_OR_MEM,
+  X86DEC_SHAPE_R32_REG,
+  X86DEC_SHAPE_R32_OR_MEM,
+  X86DEC_SHAPE_MEM16_RM,
+  X86DEC_SHAPE_MEM32_RM,
+  X86DEC_SHAPE_MEM64_RM,
+  X86DEC_SHAPE_MEM80_RM
 };
 
 typedef struct {
@@ -43,6 +57,7 @@ typedef struct {
   uint8_t shapes[3];
   uint8_t fixed[3];
   uint8_t flags;
+  uint16_t mem_bits;
 } X86decEntry;
 
 #define X86DEC_ENTRY_MODRM 0x01u
@@ -67,7 +82,11 @@ enum x86dec_group_e {
   X86DEC_GROUP_8,
   X86DEC_GROUP_9,
   X86DEC_GROUP_15,
-  X86DEC_GROUP_0F18
+  X86DEC_GROUP_0F18,
+  X86DEC_GROUP_FPU,
+  X86DEC_GROUP_3DNOW,
+  X86DEC_GROUP_0F0D,
+  X86DEC_GROUP_SSE
 };
 
 enum x86dec_fx_e {
@@ -85,5 +104,31 @@ enum x86dec_fx_e {
 extern const X86decEntry x86dec_map0[256];
 extern const X86decEntry x86dec_map1[256];
 
+typedef struct {
+  uint16_t mnemonic;
+  uint8_t count;
+  uint8_t shapes[3];
+  uint16_t mem_bits;
+} X86decSseVariant;
+
+typedef struct {
+  X86decSseVariant base;
+  X86decSseVariant variant_66;
+  X86decSseVariant variant_f3;
+  X86decSseVariant variant_f2;
+} X86decSseEntry;
+
+extern const X86decSseEntry x86dec_sse_mov[256];
+extern const X86decSseEntry x86dec_sse_alu[256];
+extern const uint16_t x86dec_3dnow[256];
+
 enum x86dec_status_e x86dec_resolve(uint8_t map, uint8_t opcode,
+    uint8_t modrm, uint8_t tail, uint16_t fx, X86decEntry* out);
+enum x86dec_status_e x86dec_resolve_sse(uint8_t opcode, uint8_t modrm,
+    uint16_t fx, X86decEntry* out);
+enum x86dec_status_e x86dec_resolve_crypto(uint8_t map, uint8_t opcode,
     uint8_t modrm, uint16_t fx, X86decEntry* out);
+enum x86dec_status_e x86dec_resolve_fpu_low(uint8_t escape, uint8_t modrm,
+    X86decEntry* out);
+enum x86dec_status_e x86dec_resolve_fpu_high(uint8_t escape, uint8_t modrm,
+    X86decEntry* out);

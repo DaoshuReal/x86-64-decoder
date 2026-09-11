@@ -260,7 +260,338 @@ static const char* const x86dec_mnemonic_texts[X86DEC_MNEMONIC_COUNT] = {
   [MN(LDS)] = "lds",
   [MN(AAM)] = "aam",
   [MN(AAD)] = "aad",
-  [MN(SALC)] = "salc"
+  [MN(SALC)] = "salc",
+  [MN(FADD)] = "fadd",
+  [MN(FADDP)] = "faddp",
+  [MN(FIADD)] = "fiadd",
+  [MN(FMUL)] = "fmul",
+  [MN(FMULP)] = "fmulp",
+  [MN(FIMUL)] = "fimul",
+  [MN(FCOM)] = "fcom",
+  [MN(FCOMP)] = "fcomp",
+  [MN(FCOMPP)] = "fcompp",
+  [MN(FCOMI)] = "fcomi",
+  [MN(FCOMIP)] = "fcomip",
+  [MN(FICOM)] = "ficom",
+  [MN(FICOMP)] = "ficomp",
+  [MN(FUCOM)] = "fucom",
+  [MN(FUCOMP)] = "fucomp",
+  [MN(FUCOMPP)] = "fucompp",
+  [MN(FUCOMI)] = "fucomi",
+  [MN(FUCOMIP)] = "fucomip",
+  [MN(FSUB)] = "fsub",
+  [MN(FSUBP)] = "fsubp",
+  [MN(FISUB)] = "fisub",
+  [MN(FSUBR)] = "fsubr",
+  [MN(FSUBRP)] = "fsubrp",
+  [MN(FISUBR)] = "fisubr",
+  [MN(FDIV)] = "fdiv",
+  [MN(FDIVP)] = "fdivp",
+  [MN(FIDIV)] = "fidiv",
+  [MN(FDIVR)] = "fdivr",
+  [MN(FDIVRP)] = "fdivrp",
+  [MN(FIDIVR)] = "fidivr",
+  [MN(FLD)] = "fld",
+  [MN(FILD)] = "fild",
+  [MN(FBLD)] = "fbld",
+  [MN(FST)] = "fst",
+  [MN(FIST)] = "fist",
+  [MN(FSTP)] = "fstp",
+  [MN(FISTP)] = "fistp",
+  [MN(FISTTP)] = "fisttp",
+  [MN(FBSTP)] = "fbstp",
+  [MN(FLDENV)] = "fldenv",
+  [MN(FLDCW)] = "fldcw",
+  [MN(FNSTENV)] = "fnstenv",
+  [MN(FNSTCW)] = "fnstcw",
+  [MN(FRSTOR)] = "frstor",
+  [MN(FSAVE)] = "fsave",
+  [MN(FNSTSW)] = "fnstsw",
+  [MN(FCHS)] = "fchs",
+  [MN(FABS)] = "fabs",
+  [MN(FTST)] = "ftst",
+  [MN(FXAM)] = "fxam",
+  [MN(FLD1)] = "fld1",
+  [MN(FLDL2T)] = "fldl2t",
+  [MN(FLDL2E)] = "fldl2e",
+  [MN(FLDPI)] = "fldpi",
+  [MN(FLDLG2)] = "fldlg2",
+  [MN(FLDLN2)] = "fldln2",
+  [MN(FLDZ)] = "fldz",
+  [MN(F2XM1)] = "f2xm1",
+  [MN(FYL2X)] = "fyl2x",
+  [MN(FPTAN)] = "fptan",
+  [MN(FPATN)] = "fpatan",
+  [MN(FXTRACT)] = "fxtract",
+  [MN(FPREM1)] = "fprem1",
+  [MN(FDECSTP)] = "fdecstp",
+  [MN(FINCSTP)] = "fincstp",
+  [MN(FPREM)] = "fprem",
+  [MN(FYL2XP1)] = "fyl2xp1",
+  [MN(FSQRT)] = "fsqrt",
+  [MN(FSINCOS)] = "fsincos",
+  [MN(FRNDINT)] = "frndint",
+  [MN(FSCALE)] = "fscale",
+  [MN(FSIN)] = "fsin",
+  [MN(FCOS)] = "fcos",
+  [MN(FNOP)] = "fnop",
+  [MN(FXCH)] = "fxch",
+  [MN(FCMOVB)] = "fcmovb",
+  [MN(FCMOVE)] = "fcmove",
+  [MN(FCMOVBE)] = "fcmovbe",
+  [MN(FCMOVU)] = "fcmovu",
+  [MN(FCMOVNB)] = "fcmovnb",
+  [MN(FCMOVNE)] = "fcmovne",
+  [MN(FCMOVNBE)] = "fcmovnbe",
+  [MN(FCMOVNU)] = "fcmovnu",
+  [MN(FNCLEX)] = "fnclex",
+  [MN(FNINIT)] = "fninit",
+  [MN(FNENI)] = "fneni",
+  [MN(FNDISI)] = "fndisi",
+  [MN(FNSETPM)] = "fnsetpm",
+  [MN(FFREE)] = "ffree",
+  [MN(FFREEP)] = "ffreep",
+  [MN(PI2FW)] = "pi2fw",
+  [MN(PI2FD)] = "pi2fd",
+  [MN(PF2IW)] = "pf2iw",
+  [MN(PF2ID)] = "pf2id",
+  [MN(PFNACC)] = "pfnacc",
+  [MN(PFPNACC)] = "pfpnacc",
+  [MN(PFCMPGE)] = "pfcmpge",
+  [MN(PFCMPGT)] = "pfcmpgt",
+  [MN(PFCMPEQ)] = "pfcmpeq",
+  [MN(PFMIN)] = "pfmin",
+  [MN(PFRCP)] = "pfrcp",
+  [MN(PFRSQRT)] = "pfrsqrt",
+  [MN(PFRCPIT1)] = "pfrcpit1",
+  [MN(PFRCPIT2)] = "pfrcpit2",
+  [MN(PFRSQIT1)] = "pfrsqit1",
+  [MN(PFSUB)] = "pfsub",
+  [MN(PFSUBR)] = "pfsubr",
+  [MN(PFADD)] = "pfadd",
+  [MN(PFACC)] = "pfacc",
+  [MN(PFMAX)] = "pfmax",
+  [MN(PFMUL)] = "pfmul",
+  [MN(PMULHRW)] = "pmulhrw",
+  [MN(PSWAPD)] = "pswapd",
+  [MN(PAVGUSB)] = "pavgusb",
+  [MN(FEMMS)] = "femms",
+  [MN(PREFETCH)] = "prefetch",
+  [MN(PREFETCHW)] = "prefetchw",
+  [MN(VMRUN)] = "vmrun",
+  [MN(VMLOAD)] = "vmload",
+  [MN(VMSAVE)] = "vmsave",
+  [MN(CLGI)] = "clgi",
+  [MN(STGI)] = "stgi",
+  [MN(INVLPGA)] = "invlpga",
+  [MN(MONITORX)] = "monitorx",
+  [MN(MWAITX)] = "mwaitx",
+  [MN(CLZERO)] = "clzero",
+  [MN(RDPRU)] = "rdpru",
+  [MN(SERIALIZE)] = "serialize",
+  [MN(HRESET)] = "hreset",
+  [MN(CLUI)] = "clui",
+  [MN(STUI)] = "stui",
+  [MN(TESTUI)] = "testui",
+  [MN(UIRET)] = "uiret",
+  [MN(SENDUIPI)] = "senduipi",
+  [MN(RDSSP)] = "rdssp",
+  [MN(SAVEPREVSSP)] = "saveprevssp",
+  [MN(RSTORSSP)] = "rstorssp",
+  [MN(WRMSRNS)] = "wrmsrns",
+  [MN(PCONFIG)] = "pconfig",
+  [MN(ENCLV)] = "enclv",
+  [MN(ENCLS)] = "encls",
+  [MN(ENCLU)] = "enclu",
+  [MN(RSM)] = "rsm",
+  [MN(AESENC)] = "aesenc",
+  [MN(AESENCLAST)] = "aesenclast",
+  [MN(AESDEC)] = "aesdec",
+  [MN(AESDECLAST)] = "aesdeclast",
+  [MN(AESIMC)] = "aesimc",
+  [MN(AESKEYGENASSIST)] = "aeskeygenassist",
+  [MN(PCLMULQDQ)] = "pclmulqdq",
+  [MN(CRC32)] = "crc32",
+  [MN(SHA1NEXTE)] = "sha1nexte",
+  [MN(SHA1MSG1)] = "sha1msg1",
+  [MN(SHA1MSG2)] = "sha1msg2",
+  [MN(SHA1RNDS4)] = "sha1rnds4",
+  [MN(SHA256RNDS2)] = "sha256rnds2",
+  [MN(SHA256MSG1)] = "sha256msg1",
+  [MN(SHA256MSG2)] = "sha256msg2",
+  [MN(MOVUPS)] = "movups",
+  [MN(MOVUPD)] = "movupd",
+  [MN(MOVSS)] = "movss",
+  [MN(MOVSD_SSE)] = "movsd",
+  [MN(MOVAPS)] = "movaps",
+  [MN(MOVAPD)] = "movapd",
+  [MN(MOVLPS)] = "movlps",
+  [MN(MOVLPD)] = "movlpd",
+  [MN(MOVHPS)] = "movhps",
+  [MN(MOVHPD)] = "movhpd",
+  [MN(MOVLHPS)] = "movlhps",
+  [MN(MOVQ)] = "movq",
+  [MN(MOVD)] = "movd",
+  [MN(MOVDQA)] = "movdqa",
+  [MN(MOVDQU)] = "movdqu",
+  [MN(MOVMSKPS)] = "movmskps",
+  [MN(MOVMSKPD)] = "movmskpd",
+  [MN(MOVNTPS)] = "movntps",
+  [MN(MOVNTPD)] = "movntpd",
+  [MN(MOVNTDQ)] = "movntdq",
+  [MN(MOVNTI)] = "movnti",
+  [MN(MOVNTQ)] = "movntq",
+  [MN(MASKMOVQ)] = "maskmovq",
+  [MN(MASKMOVDQU)] = "maskmovdqu",
+  [MN(LDDQU)] = "lddqu",
+  [MN(MOVDQ2Q)] = "movdq2q",
+  [MN(MOVQ2DQ)] = "movq2dq",
+  [MN(ADDPS)] = "addps",
+  [MN(ADDPD)] = "addpd",
+  [MN(ADDSS)] = "addss",
+  [MN(ADDSD)] = "addsd",
+  [MN(SUBPS)] = "subps",
+  [MN(SUBPD)] = "subpd",
+  [MN(SUBSS)] = "subss",
+  [MN(SUBSD)] = "subsd",
+  [MN(MULPS)] = "mulps",
+  [MN(MULPD)] = "mulpd",
+  [MN(MULSS)] = "mulss",
+  [MN(MULSD)] = "mulsd",
+  [MN(DIVPS)] = "divps",
+  [MN(DIVPD)] = "divpd",
+  [MN(DIVSS)] = "divss",
+  [MN(DIVSD)] = "divsd",
+  [MN(SQRTPS)] = "sqrtps",
+  [MN(SQRTPD)] = "sqrtpd",
+  [MN(SQRTSS)] = "sqrtss",
+  [MN(SQRTSD)] = "sqrtsd",
+  [MN(MAXPS)] = "maxps",
+  [MN(MAXPD)] = "maxpd",
+  [MN(MAXSS)] = "maxss",
+  [MN(MAXSD)] = "maxsd",
+  [MN(MINPS)] = "minps",
+  [MN(MINPD)] = "minpd",
+  [MN(MINSS)] = "minss",
+  [MN(MINSD)] = "minsd",
+  [MN(RCPPS)] = "rcpps",
+  [MN(RCPSS)] = "rcpss",
+  [MN(RSQRTPS)] = "rsqrtps",
+  [MN(RSQRTSS)] = "rsqrtss",
+  [MN(ANDPS)] = "andps",
+  [MN(ANDPD)] = "andpd",
+  [MN(ANDNPS)] = "andnps",
+  [MN(ANDNPD)] = "andnpd",
+  [MN(ORPS)] = "orps",
+  [MN(ORPD)] = "orpd",
+  [MN(XORPS)] = "xorps",
+  [MN(XORPD)] = "xorpd",
+  [MN(CMPPS)] = "cmpps",
+  [MN(CMPPD)] = "cmppd",
+  [MN(CMPSS)] = "cmpss",
+  [MN(CMPSD_SSE)] = "cmpsd",
+  [MN(COMISS)] = "comiss",
+  [MN(UCOMISS)] = "ucomiss",
+  [MN(COMISD)] = "comisd",
+  [MN(UCOMISD)] = "ucomisd",
+  [MN(CVTPI2PS)] = "cvtpi2ps",
+  [MN(CVTPI2PD)] = "cvtpi2pd",
+  [MN(CVTSI2SS)] = "cvtsi2ss",
+  [MN(CVTSI2SD)] = "cvtsi2sd",
+  [MN(CVTTPS2PI)] = "cvttps2pi",
+  [MN(CVTTPD2PI)] = "cvttpd2pi",
+  [MN(CVTTSS2SI)] = "cvttss2si",
+  [MN(CVTTSD2SI)] = "cvttsd2si",
+  [MN(CVTPS2PI)] = "cvtps2pi",
+  [MN(CVTPD2PI)] = "cvtpd2pi",
+  [MN(CVTSS2SI)] = "cvtss2si",
+  [MN(CVTSD2SI)] = "cvtsd2si",
+  [MN(CVTDQ2PS)] = "cvtdq2ps",
+  [MN(CVTDQ2PD)] = "cvtdq2pd",
+  [MN(CVTPS2DQ)] = "cvtps2dq",
+  [MN(CVTPD2DQ)] = "cvtpd2dq",
+  [MN(CVTTPS2DQ)] = "cvttps2dq",
+  [MN(CVTTPD2DQ)] = "cvttpd2dq",
+  [MN(CVTPS2PD)] = "cvtps2pd",
+  [MN(CVTPD2PS)] = "cvtpd2ps",
+  [MN(CVTSS2SD)] = "cvtss2sd",
+  [MN(CVTSD2SS)] = "cvtsd2ss",
+  [MN(UNPCKLPS)] = "unpcklps",
+  [MN(UNPCKHPS)] = "unpckhps",
+  [MN(UNPCKLPD)] = "unpcklpd",
+  [MN(UNPCKHPD)] = "unpckhpd",
+  [MN(SHUFPS)] = "shufps",
+  [MN(SHUFPD)] = "shufpd",
+  [MN(PUNPCKLBW)] = "punpcklbw",
+  [MN(PUNPCKLWD)] = "punpcklwd",
+  [MN(PUNPCKLDQ)] = "punpckldq",
+  [MN(PACKSSWB)] = "packsswb",
+  [MN(PCMPGTB)] = "pcmpgtb",
+  [MN(PCMPGTW)] = "pcmpgtw",
+  [MN(PCMPGTD)] = "pcmpgtd",
+  [MN(PACKUSWB)] = "packuswb",
+  [MN(PUNPCKHBW)] = "punpckhbw",
+  [MN(PUNPCKHWD)] = "punpckhwd",
+  [MN(PUNPCKHDQ)] = "punpckhdq",
+  [MN(PACKSSDW)] = "packssdw",
+  [MN(PUNPCKLQDQ)] = "punpcklqdq",
+  [MN(PUNPCKHQDQ)] = "punpckhqdq",
+  [MN(PSHUFW)] = "pshufw",
+  [MN(PSHUFHW)] = "pshufhw",
+  [MN(PSHUFLW)] = "pshuflw",
+  [MN(PSHUFD)] = "pshufd",
+  [MN(PSRLW)] = "psrlw",
+  [MN(PSRLD)] = "psrld",
+  [MN(PSRLQ)] = "psrlq",
+  [MN(PSRAW)] = "psraw",
+  [MN(PSRAD)] = "psrad",
+  [MN(PSLLW)] = "psllw",
+  [MN(PSLLD)] = "pslld",
+  [MN(PSLLQ)] = "psllq",
+  [MN(PSRLDQ)] = "psrldq",
+  [MN(PSLLDQ)] = "pslldq",
+  [MN(PCMPEQB)] = "pcmpeqb",
+  [MN(PCMPEQW)] = "pcmpeqw",
+  [MN(PCMPEQD)] = "pcmpeqd",
+  [MN(PADDQ)] = "paddq",
+  [MN(PADDB)] = "paddb",
+  [MN(PADDW)] = "paddw",
+  [MN(PADDD)] = "paddd",
+  [MN(PMULLW)] = "pmullw",
+  [MN(PMULHW)] = "pmulhw",
+  [MN(PMULHUW)] = "pmulhuw",
+  [MN(PMULUDQ)] = "pmuludq",
+  [MN(PMADDWD)] = "pmaddwd",
+  [MN(PSADBW)] = "psadbw",
+  [MN(PSUBUSB)] = "psubusb",
+  [MN(PSUBUSW)] = "psubusw",
+  [MN(PADDUSB)] = "paddusb",
+  [MN(PADDUSW)] = "paddusw",
+  [MN(PSUBSB)] = "psubsb",
+  [MN(PSUBSW)] = "psubsw",
+  [MN(PADDSB)] = "paddsb",
+  [MN(PADDSW)] = "paddsw",
+  [MN(PSUBB)] = "psubb",
+  [MN(PSUBW)] = "psubw",
+  [MN(PSUBD)] = "psubd",
+  [MN(PSUBQ)] = "psubq",
+  [MN(PAND)] = "pand",
+  [MN(PANDN)] = "pandn",
+  [MN(POR)] = "por",
+  [MN(PXOR)] = "pxor",
+  [MN(PAVGB)] = "pavgb",
+  [MN(PAVGW)] = "pavgw",
+  [MN(PMINUB)] = "pminub",
+  [MN(PMAXUB)] = "pmaxub",
+  [MN(PMINSW)] = "pminsw",
+  [MN(PMAXSW)] = "pmaxsw",
+  [MN(PMOVMSKB)] = "pmovmskb",
+  [MN(HADDPS)] = "haddps",
+  [MN(HADDPD)] = "haddpd",
+  [MN(HSUBPS)] = "hsubps",
+  [MN(HSUBPD)] = "hsubpd",
+  [MN(ADDSUBPS)] = "addsubps",
+  [MN(ADDSUBPD)] = "addsubpd"
 };
 
 static const char* const x86dec_register_texts[X86DEC_REG_COUNT] = {
@@ -365,7 +696,39 @@ static const char* const x86dec_register_texts[X86DEC_REG_COUNT] = {
   [RG(DR4)] = "dr4",
   [RG(DR5)] = "dr5",
   [RG(DR6)] = "dr6",
-  [RG(DR7)] = "dr7"
+  [RG(DR7)] = "dr7",
+  [RG(ST0)] = "st0",
+  [RG(ST1)] = "st1",
+  [RG(ST2)] = "st2",
+  [RG(ST3)] = "st3",
+  [RG(ST4)] = "st4",
+  [RG(ST5)] = "st5",
+  [RG(ST6)] = "st6",
+  [RG(ST7)] = "st7",
+  [RG(MM0)] = "mm0",
+  [RG(MM1)] = "mm1",
+  [RG(MM2)] = "mm2",
+  [RG(MM3)] = "mm3",
+  [RG(MM4)] = "mm4",
+  [RG(MM5)] = "mm5",
+  [RG(MM6)] = "mm6",
+  [RG(MM7)] = "mm7",
+  [RG(XMM0)] = "xmm0",
+  [RG(XMM1)] = "xmm1",
+  [RG(XMM2)] = "xmm2",
+  [RG(XMM3)] = "xmm3",
+  [RG(XMM4)] = "xmm4",
+  [RG(XMM5)] = "xmm5",
+  [RG(XMM6)] = "xmm6",
+  [RG(XMM7)] = "xmm7",
+  [RG(XMM8)] = "xmm8",
+  [RG(XMM9)] = "xmm9",
+  [RG(XMM10)] = "xmm10",
+  [RG(XMM11)] = "xmm11",
+  [RG(XMM12)] = "xmm12",
+  [RG(XMM13)] = "xmm13",
+  [RG(XMM14)] = "xmm14",
+  [RG(XMM15)] = "xmm15"
 };
 
 const char* x86dec_mnemonic_text(enum x86dec_mnemonic_e mnemonic)
@@ -373,6 +736,7 @@ const char* x86dec_mnemonic_text(enum x86dec_mnemonic_e mnemonic)
   if ((unsigned)mnemonic >= X86DEC_MNEMONIC_COUNT) {
     return "invalid";
   }
+
   return x86dec_mnemonic_texts[mnemonic];
 }
 
@@ -381,37 +745,46 @@ const char* x86dec_register_text(enum x86dec_register_e reg)
   if ((unsigned)reg >= X86DEC_REG_COUNT) {
     return "none";
   }
+
   return x86dec_register_texts[reg];
 }
 
 bool x86dec_format_insn(const X86decInsn* insn,
     const X86decOperand* operands, char* buffer, size_t size)
 {
-  char* p = buffer;
-  size_t left = size;
-  int n;
+  char* cursor = buffer;
+  size_t remaining = size;
+  int written;
   uint8_t i;
+
   if (!insn || !buffer || !size) {
     return false;
   }
-#define X86DEC_EMIT(...) do { n = snprintf(p, left, __VA_ARGS__); \
-    if (n < 0 || (size_t)n >= left) { return false; } \
-    p += n; left -= (size_t)n; } while (0)
+
+#define X86DEC_EMIT(...) do { written = snprintf(cursor, remaining, __VA_ARGS__); \
+    if (written < 0 || (size_t)written >= remaining) { return false; } \
+    cursor += written; remaining -= (size_t)written; } while (0)
   if (insn->flags & X86DEC_INSN_HAS_LOCK) {
     X86DEC_EMIT("lock ");
   }
+
   if ((insn->flags & X86DEC_INSN_HAS_REP) &&
       insn->mnemonic != X86DEC_MNEMONIC_PAUSE) {
     X86DEC_EMIT("rep ");
   }
+
   if (insn->flags & X86DEC_INSN_HAS_REPNE) {
     X86DEC_EMIT("repne ");
   }
+
   X86DEC_EMIT("%s", x86dec_mnemonic_text(insn->mnemonic));
+
   if (operands) {
     for (i = 0; i < insn->operand_count; i++) {
       const X86decOperand* op = &operands[i];
+
       X86DEC_EMIT(i ? ", " : " ");
+
       switch (op->type) {
         case X86DEC_OPERAND_REG:
           X86DEC_EMIT("%s", x86dec_register_text(op->reg));
@@ -420,54 +793,71 @@ bool x86dec_format_insn(const X86decInsn* insn,
           X86DEC_EMIT("0x%llx", (unsigned long long)op->imm.value);
           break;
         case X86DEC_OPERAND_MEM: {
-          const char* sz = 0;
-          unsigned long long mag;
-          int first = 1;
+          const char* size_text = 0;
+          unsigned long long magnitude;
+          int is_first = 1;
+
           switch (op->size) {
             case 8:
-              sz = "byte ptr ";
+              size_text = "byte ptr ";
               break;
             case 16:
-              sz = "word ptr ";
+              size_text = "word ptr ";
               break;
             case 32:
-              sz = "dword ptr ";
+              size_text = "dword ptr ";
               break;
             case 64:
-              sz = "qword ptr ";
+              size_text = "qword ptr ";
+              break;
+            case 48:
+              size_text = "fword ptr ";
+              break;
+            case 80:
+              size_text = "tbyte ptr ";
               break;
             default:
               break;
           }
-          if (sz) {
-            X86DEC_EMIT("%s", sz);
+
+          if (size_text) {
+            X86DEC_EMIT("%s", size_text);
           }
+
           if (op->mem.segment != X86DEC_REG_NONE) {
             X86DEC_EMIT("%s:", x86dec_register_text(op->mem.segment));
           }
+
           X86DEC_EMIT("[");
+
           if (op->mem.base != X86DEC_REG_NONE) {
             X86DEC_EMIT("%s", x86dec_register_text(op->mem.base));
-            first = 0;
+            is_first = 0;
           }
+
           if (op->mem.index != X86DEC_REG_NONE) {
-            X86DEC_EMIT(first ? "%s" : "+%s",
+            X86DEC_EMIT(is_first ? "%s" : "+%s",
                 x86dec_register_text(op->mem.index));
+
             if (op->mem.scale > 1) {
               X86DEC_EMIT("*%u", op->mem.scale);
             }
-            first = 0;
+
+            is_first = 0;
           }
-          mag = op->mem.disp < 0
+
+          magnitude = op->mem.disp < 0
               ? 0ULL - (unsigned long long)op->mem.disp
               : (unsigned long long)op->mem.disp;
-          if (op->mem.has_disp || first) {
-            if (first) {
-              X86DEC_EMIT(op->mem.disp < 0 ? "-0x%llx" : "0x%llx", mag);
+
+          if (op->mem.has_disp || is_first) {
+            if (is_first) {
+              X86DEC_EMIT(op->mem.disp < 0 ? "-0x%llx" : "0x%llx", magnitude);
             } else {
-              X86DEC_EMIT(op->mem.disp < 0 ? "-0x%llx" : "+0x%llx", mag);
+              X86DEC_EMIT(op->mem.disp < 0 ? "-0x%llx" : "+0x%llx", magnitude);
             }
           }
+
           X86DEC_EMIT("]");
           break;
         }
@@ -477,6 +867,7 @@ bool x86dec_format_insn(const X86decInsn* insn,
       }
     }
   }
+
   return true;
 #undef X86DEC_EMIT
 }

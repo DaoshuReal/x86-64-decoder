@@ -5,17 +5,9 @@
 
 #include "x86dec.h"
 
-#define MN(x) X86DEC_MNEMONIC_##x
+#include "test/vectors.h"
 
-typedef struct {
-  const char* code;
-  uint8_t len;
-  uint8_t legacy;
-  enum x86dec_status_e status;
-  enum x86dec_mnemonic_e mnemonic;
-  uint8_t insn_len;
-  const char* text;
-} Vec;
+#define MN(x) X86DEC_MNEMONIC_##x
 
 static const Vec x86dec_vectors[] = {
   {"\x90", 1, 0, X86DEC_OK, MN(NOP), 1, "nop"},
@@ -202,7 +194,7 @@ static const Vec x86dec_vectors[] = {
   {"\x0F\x00\xC0", 3, 0, X86DEC_OK, MN(SLDT), 3, "sldt ax"},
   {"\x0F\x00\x00", 3, 0, X86DEC_OK, MN(SLDT), 3, "sldt word ptr ds:[rax]"},
   {"\x0F\x00\xC8", 3, 0, X86DEC_OK, MN(STR), 3, "str ax"},
-  {"\x0F\x01\x00", 3, 0, X86DEC_OK, MN(SGDT), 3, "sgdt ds:[rax]"},
+  {"\x0F\x01\x00", 3, 0, X86DEC_OK, MN(SGDT), 3, "sgdt tbyte ptr ds:[rax]"},
   {"\x0F\x18\x00", 3, 0, X86DEC_OK, MN(PREFETCHNTA), 3,
       "prefetchnta byte ptr ds:[rax]"},
   {"\x0F\x18\x08", 3, 0, X86DEC_OK, MN(PREFETCHT0), 3,
@@ -256,16 +248,16 @@ static const Vec x86dec_vectors[] = {
   {"\xFF", 1, 0, X86DEC_NEED_MORE, MN(INVALID), 0, 0},
   {"\xF6\xC0", 2, 0, X86DEC_NEED_MORE, MN(INVALID), 0, 0},
   {"\xE8\x00\x00", 3, 0, X86DEC_NEED_MORE, MN(INVALID), 0, 0},
-  {"\xD8\x00", 2, 0, X86DEC_UNSUPPORTED, MN(INVALID), 0, 0},
-  {"\x66\x0F\x6F\xC0", 4, 0, X86DEC_UNSUPPORTED, MN(INVALID), 0, 0},
+  {"\xD8\x00", 2, 0, X86DEC_OK, MN(FADD), 2, "fadd dword ptr ds:[rax]"},
+  {"\x66\x0F\x6F\xC0", 4, 0, X86DEC_OK, MN(MOVDQA), 4, "movdqa xmm0, xmm0"},
   {"\xC5\xF8\x77", 3, 0, X86DEC_UNSUPPORTED, MN(INVALID), 0, 0},
   {"\x62\xF1\x7C\x48\x00", 5, 0, X86DEC_UNSUPPORTED, MN(INVALID), 0, 0},
-  {"\x0F\x38\x00", 3, 0, X86DEC_UNSUPPORTED, MN(INVALID), 0, 0},
-  {"\x0F\x0F\x00", 3, 0, X86DEC_UNSUPPORTED, MN(INVALID), 0, 0},
+  {"\x0F\x38\x00\x00", 4, 0, X86DEC_UNSUPPORTED, MN(INVALID), 0, 0},
+  {"\x0F\x0F\x00", 3, 0, X86DEC_NEED_MORE, MN(INVALID), 0, 0},
   {"\x8F\xC8", 2, 0, X86DEC_UNSUPPORTED, MN(INVALID), 0, 0},
   {"\x8F\xC8", 2, 1, X86DEC_INVALID, MN(INVALID), 0, 0},
   {"\xC4\xC0", 2, 1, X86DEC_INVALID, MN(INVALID), 0, 0},
-  {"\x0F\x01\xC0", 3, 0, X86DEC_INVALID, MN(INVALID), 0, 0},
+  {"\x0F\x01\xC0", 3, 0, X86DEC_OK, MN(ENCLV), 3, "enclv"},
   {"\x0F\xC7\x38", 3, 0, X86DEC_INVALID, MN(INVALID), 0, 0},
   {"\x0F\xAE\xC8", 3, 0, X86DEC_INVALID, MN(INVALID), 0, 0},
   {"\x66\x0F\xAE\xF8", 4, 0, X86DEC_UNSUPPORTED, MN(INVALID), 0, 0},
@@ -280,37 +272,44 @@ static const Vec x86dec_vectors[] = {
 };
 
 static int check_one(const X86decDecoder* dec64, const X86decDecoder* dec32,
-    const Vec* v, size_t index)
+    const Vec* vector, size_t index)
 {
-  const X86decDecoder* dec = v->legacy ? dec32 : dec64;
+  const X86decDecoder* dec = vector->legacy ? dec32 : dec64;
   X86decInsn insn = {0};
   X86decOperand ops[X86DEC_MAX_OPERANDS] = {0};
   enum x86dec_status_e st;
   char text[160];
-  st = x86dec_decode_full(dec, v->code, v->len, &insn, ops,
+
+  st = x86dec_decode_full(dec, vector->code, vector->len, &insn, ops,
       X86DEC_MAX_OPERANDS);
-  if (st != v->status) {
-    printf("FAIL [%u] status %d, want %d\n", (unsigned)index, st, v->status);
+
+  if (st != vector->status) {
+    printf("FAIL [%u] status %d, want %d\n", (unsigned)index, st, vector->status);
     return 1;
   }
+
   if (st != X86DEC_OK) {
     return 0;
   }
-  if (insn.mnemonic != v->mnemonic || insn.length != v->insn_len) {
+
+  if (insn.mnemonic != vector->mnemonic || insn.length != vector->insn_len) {
     printf("FAIL [%u] got %s/%u, want %s/%u\n", (unsigned)index,
         x86dec_mnemonic_text(insn.mnemonic), insn.length,
-        x86dec_mnemonic_text(v->mnemonic), v->insn_len);
+        x86dec_mnemonic_text(vector->mnemonic), vector->insn_len);
     return 1;
   }
-  if (v->text) {
+
+  if (vector->text) {
     text[0] = 0;
+
     if (!x86dec_format_insn(&insn, ops, text, sizeof(text)) ||
-        strcmp(text, v->text)) {
+        strcmp(text, vector->text)) {
       printf("FAIL [%u] got \"%s\", want \"%s\"\n", (unsigned)index, text,
-          v->text);
+          vector->text);
       return 1;
     }
   }
+
   return 0;
 }
 
@@ -330,22 +329,29 @@ static void bench(const X86decDecoder* dec)
   unsigned long long micros;
   unsigned long long count = 0;
   int reps;
+
   QueryPerformanceFrequency(&freq);
   QueryPerformanceCounter(&start);
+
   for (reps = 0; reps < 200000; reps++) {
-    size_t off = 0;
-    while (off < sizeof(corpus)) {
-      if (x86dec_decode_full(dec, corpus + off, sizeof(corpus) - off, &insn,
+    size_t offset = 0;
+
+    while (offset < sizeof(corpus)) {
+      if (x86dec_decode_full(dec, corpus + offset, sizeof(corpus) - offset, &insn,
           ops, 4) != X86DEC_OK) {
         break;
       }
-      off += insn.length;
+
+      offset += insn.length;
       count++;
     }
   }
+
   QueryPerformanceCounter(&end);
+
   elapsed = (unsigned long long)(end.QuadPart - start.QuadPart);
   micros = elapsed * 1000000ULL / (unsigned long long)freq.QuadPart;
+
   printf("decoded %llu insns in %llu us (%.2f M insns/s)\n", count, micros,
       (double)count / (double)micros);
 }
@@ -357,19 +363,31 @@ int main(void)
   size_t total = sizeof(x86dec_vectors) / sizeof(x86dec_vectors[0]);
   size_t fails = 0;
   size_t i;
+
   if (!x86dec_decoder_init(&dec64, X86DEC_MODE_LONG_64, X86DEC_STACK_64)) {
     printf("decoder init failed\n");
     return 1;
   }
+
   if (!x86dec_decoder_init(&dec32, X86DEC_MODE_LEGACY_32, X86DEC_STACK_32)) {
     printf("decoder init failed\n");
     return 1;
   }
+
   for (i = 0; i < total; i++) {
     fails += (size_t)check_one(&dec64, &dec32, &x86dec_vectors[i], i);
   }
+
+  for (i = 0; i < x86dec_vectors_ext_count; i++) {
+    fails += (size_t)check_one(&dec64, &dec32, &x86dec_vectors_ext[i],
+        total + i);
+  }
+
+  total += x86dec_vectors_ext_count;
+
   printf("%u/%u vectors passed\n", (unsigned)(total - fails),
       (unsigned)total);
   bench(&dec64);
+
   return fails ? 1 : 0;
 }

@@ -39,9 +39,11 @@ bool x86dec_decoder_init(X86decDecoder* decoder,
   if (!decoder) {
     return false;
   }
+
   if (mode > X86DEC_MODE_REAL_16) {
     return false;
   }
+
   if (mode == X86DEC_MODE_LONG_64) {
     if (width != X86DEC_STACK_64) {
       return false;
@@ -49,8 +51,10 @@ bool x86dec_decoder_init(X86decDecoder* decoder,
   } else if (width == X86DEC_STACK_64) {
     return false;
   }
+
   decoder->mode = mode;
   decoder->width = width;
+
   return true;
 }
 
@@ -58,7 +62,7 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
     X86decContext* context, const void* buffer, size_t length,
     X86decInsn* insn)
 {
-  X86decCursor c;
+  X86decCursor cursor;
   X86decRaw raw = {0};
   X86decContext local;
   X86decEntry resolved;
@@ -69,103 +73,157 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
   uint16_t fx;
   uint8_t map = 0;
   uint8_t opcode = 0;
+  uint8_t tail = 0;
   uint8_t b = 0;
   uint8_t i;
   uint8_t k;
   enum x86dec_status_e st;
+
   if (!decoder || !buffer || !insn || !length) {
     return X86DEC_BAD_ARG;
   }
+
   if (!context) {
     context = &local;
   }
+
   *context = (X86decContext){0};
   *insn = (X86decInsn){0};
-  c.p = (const uint8_t*)buffer;
-  c.left = length;
-  c.pos = 0;
+
+  cursor.p = (const uint8_t*)buffer;
+  cursor.left = length;
+  cursor.pos = 0;
+
   is64 = decoder->mode == X86DEC_MODE_LONG_64;
   eosz = x86dec_default_eosz(decoder);
   easz = x86dec_default_easz(decoder);
-  st = x86dec_scan_prefixes(&c, &raw);
+
+  st = x86dec_scan_prefixes(&cursor, &raw);
+
   if (st != X86DEC_OK) {
     return st;
   }
+
   if (raw.osz) {
     eosz = is64 ? 16 : (eosz == 16 ? 32 : 16);
   }
+
   if (raw.asz) {
     easz = is64 ? 32 : (easz == 16 ? 32 : 16);
   }
-  if (is64 && c.left && (c.p[0] & 0xF0) == 0x40) {
+
+  if (is64 && cursor.left && (cursor.p[0] & 0xF0) == 0x40) {
     raw.has_rex = true;
-    raw.rex = c.p[0];
-    c.p++;
-    c.left--;
-    c.pos++;
+    raw.rex = cursor.p[0];
+    cursor.p++;
+    cursor.left--;
+    cursor.pos++;
+
     if (raw.rex & 0x08) {
       eosz = 64;
     }
   }
-  raw.opcode_offset = (uint8_t)c.pos;
-  if (!x86dec_take(&c, &opcode)) {
+
+  raw.opcode_offset = (uint8_t)cursor.pos;
+
+  if (!x86dec_take(&cursor, &opcode)) {
     return X86DEC_NEED_MORE;
   }
+
   if (opcode == 0x0F) {
-    if (!x86dec_take(&c, &b)) {
+    if (!x86dec_take(&cursor, &b)) {
       return X86DEC_NEED_MORE;
     }
+
     if (b == 0x38 || b == 0x3A) {
       map = b == 0x38 ? 2 : 3;
-      if (!x86dec_take(&c, &opcode)) {
+
+      if (!x86dec_take(&cursor, &opcode)) {
         return X86DEC_NEED_MORE;
       }
-      fill_error(insn, decoder, map, opcode, c.pos);
-      return X86DEC_UNSUPPORTED;
+    } else {
+      map = 1;
+      opcode = b;
     }
-    map = 1;
-    opcode = b;
   }
+
   if (is64 && !map && (opcode == 0xC4 || opcode == 0xC5 || opcode == 0x62)) {
-    fill_error(insn, decoder, map, opcode, c.pos);
+    fill_error(insn, decoder, map, opcode, cursor.pos);
     return X86DEC_UNSUPPORTED;
   }
-  base = map ? &x86dec_map1[opcode] : &x86dec_map0[opcode];
-  if (base->flags & X86DEC_ENTRY_MODRM) {
-    st = x86dec_scan_tail(&c, easz, &raw);
-    if (st != X86DEC_OK) {
-      return st;
-    }
-  }
+
   fx = (uint16_t)(is64 ? X86DEC_FX_64 : 0);
   fx |= (uint16_t)((eosz == 16 ? 0 : eosz == 32 ? 1 : 2)
       << X86DEC_FX_EOSZ_SHIFT);
   fx |= (uint16_t)((easz == 16 ? 0 : easz == 32 ? 1 : 2)
       << X86DEC_FX_EASZ_SHIFT);
+
   if (raw.rep) {
     fx |= X86DEC_FX_F3;
   }
+
   if (raw.repne) {
     fx |= X86DEC_FX_F2;
   }
+
   if (raw.osz) {
     fx |= X86DEC_FX_66;
   }
+
   if (raw.has_rex && (raw.rex & 0x08)) {
     fx |= X86DEC_FX_REXW;
   }
+
   if (raw.has_rex && (raw.rex & 0x01)) {
     fx |= X86DEC_FX_REXB;
   }
+
   if (raw.has_rex) {
     fx |= X86DEC_FX_REX;
   }
-  st = x86dec_resolve(map, opcode, raw.modrm, fx, &resolved);
-  if (st != X86DEC_OK) {
-    fill_error(insn, decoder, map, opcode, c.pos);
-    insn->raw = raw;
-    return st;
+
+  if (map >= 2) {
+    st = x86dec_scan_tail(&cursor, easz, &raw);
+
+    if (st != X86DEC_OK) {
+      return st;
+    }
+
+    st = x86dec_resolve_crypto(map, opcode, raw.modrm, fx, &resolved);
+
+    if (st != X86DEC_OK) {
+      fill_error(insn, decoder, map, opcode, cursor.pos);
+      insn->raw = raw;
+      return st;
+    }
+  } else {
+    base = map ? &x86dec_map1[opcode] : &x86dec_map0[opcode];
+
+    if (base->flags & X86DEC_ENTRY_MODRM) {
+      st = x86dec_scan_tail(&cursor, easz, &raw);
+
+      if (st != X86DEC_OK) {
+        return st;
+      }
+    }
+
+    tail = 0;
+
+    if (map == 1 && opcode == 0x0F) {
+      if (!x86dec_take(&cursor, &tail)) {
+        return X86DEC_NEED_MORE;
+      }
+    }
+
+    st = x86dec_resolve(map, opcode, raw.modrm, tail, fx, &resolved);
+
+    if (st != X86DEC_OK) {
+      fill_error(insn, decoder, map, opcode, cursor.pos);
+      insn->raw = raw;
+      return st;
+    }
   }
+
   if (is64 && eosz == 32) {
     switch (resolved.mnemonic) {
       case X86DEC_MNEMONIC_PUSH:
@@ -184,53 +242,59 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
         break;
     }
   }
-  if (raw.rep) {
-    switch (resolved.mnemonic) {
-      case X86DEC_MNEMONIC_PAUSE:
-      case X86DEC_MNEMONIC_TZCNT:
-      case X86DEC_MNEMONIC_LZCNT:
-      case X86DEC_MNEMONIC_RDPID:
-      case X86DEC_MNEMONIC_POPCNT:
-      case X86DEC_MNEMONIC_ENDBR64:
-      case X86DEC_MNEMONIC_ENDBR32:
-        raw.rep = false;
-        break;
-      default:
-        break;
-    }
+
+  if (resolved.mnemonic == X86DEC_MNEMONIC_MOVQ) {
+    eosz = 64;
   }
+
+  if (map >= 1) {
+    raw.rep = false;
+    raw.repne = false;
+  } else if (raw.rep && resolved.mnemonic == X86DEC_MNEMONIC_PAUSE) {
+    raw.rep = false;
+  }
+
   for (i = 0; i < resolved.count; i++) {
-    uint8_t n;
+    uint8_t byte_count;
+
     if (resolved.shapes[i] == X86DEC_SHAPE_MOFFS) {
-      uint8_t msize = (uint8_t)(easz / 8);
-      uint64_t v = 0;
-      for (k = 0; k < msize; k++) {
-        if (!x86dec_take(&c, &b)) {
+      uint8_t moffs_size = (uint8_t)(easz / 8);
+      uint64_t value = 0;
+
+      for (k = 0; k < moffs_size; k++) {
+        if (!x86dec_take(&cursor, &b)) {
           return X86DEC_NEED_MORE;
         }
-        v |= (uint64_t)b << (k * 8);
+
+        value |= (uint64_t)b << (k * 8);
       }
+
       raw.has_moffs = true;
-      raw.moffs = v;
+      raw.moffs = value;
       continue;
     }
-    n = shape_imm_bytes(resolved.shapes[i], eosz);
-    for (k = 0; k < n; k++) {
-      if (!x86dec_take(&c, &b)) {
+
+    byte_count = shape_imm_bytes(resolved.shapes[i], eosz);
+
+    for (k = 0; k < byte_count; k++) {
+      if (!x86dec_take(&cursor, &b)) {
         return X86DEC_NEED_MORE;
       }
+
       raw.imm |= (uint64_t)b << (raw.imm_size * 8);
       raw.imm_size++;
     }
   }
-  if (c.pos > X86DEC_MAX_INSN_LENGTH) {
-    fill_error(insn, decoder, map, opcode, c.pos);
+
+  if (cursor.pos > X86DEC_MAX_INSN_LENGTH) {
+    fill_error(insn, decoder, map, opcode, cursor.pos);
     insn->raw = raw;
     return X86DEC_INVALID;
   }
+
   insn->mode = decoder->mode;
   insn->mnemonic = (enum x86dec_mnemonic_e)resolved.mnemonic;
-  insn->length = (uint8_t)c.pos;
+  insn->length = (uint8_t)cursor.pos;
   insn->map = map;
   insn->opcode = opcode;
   insn->stack_width = (uint8_t)decoder->width;
@@ -238,31 +302,41 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
   insn->address_width = easz;
   insn->operand_count = resolved.count;
   insn->flags = 0;
+
   if (raw.lock) {
     insn->flags |= X86DEC_INSN_HAS_LOCK;
   }
+
   if (raw.rep) {
     insn->flags |= X86DEC_INSN_HAS_REP;
   }
+
   if (raw.repne) {
     insn->flags |= X86DEC_INSN_HAS_REPNE;
   }
+
   if (raw.has_rex) {
     insn->flags |= X86DEC_INSN_HAS_REX;
   }
+
   if (raw.has_modrm) {
     insn->flags |= X86DEC_INSN_HAS_MODRM;
   }
+
   if (raw.has_sib) {
     insn->flags |= X86DEC_INSN_HAS_SIB;
   }
+
   if (raw.osz) {
     insn->flags |= X86DEC_INSN_OSZ_OVERRIDE;
   }
+
   if (raw.asz) {
     insn->flags |= X86DEC_INSN_ASZ_OVERRIDE;
   }
+
   insn->raw = raw;
+
   context->eosz = eosz;
   context->easz = easz;
   context->has_rex = raw.has_rex;
@@ -285,10 +359,12 @@ enum x86dec_status_e x86dec_decode_insn(const X86decDecoder* decoder,
   context->fixed[0] = resolved.fixed[0];
   context->fixed[1] = resolved.fixed[1];
   context->fixed[2] = resolved.fixed[2];
-  context->length = (uint8_t)c.pos;
+  context->length = (uint8_t)cursor.pos;
   context->opcode = opcode;
   context->map = map;
   context->flags = insn->flags;
+  context->mem_bits = resolved.mem_bits;
+
   return X86DEC_OK;
 }
 
@@ -298,13 +374,17 @@ enum x86dec_status_e x86dec_decode_full(const X86decDecoder* decoder,
 {
   X86decContext context;
   enum x86dec_status_e st;
+
   if (!operands && operand_count) {
     return X86DEC_BAD_ARG;
   }
+
   st = x86dec_decode_insn(decoder, &context, buffer, length, insn);
+
   if (st != X86DEC_OK) {
     return st;
   }
+
   return x86dec_decode_operands(decoder, &context, insn, operands,
       operand_count);
 }
