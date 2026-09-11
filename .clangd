@@ -1,0 +1,7 @@
+CompileFlags:
+  CompilationDatabase: build
+
+Diagnostics:
+  Suppress:
+    - include-cleaner
+  UnusedIncludes: None
