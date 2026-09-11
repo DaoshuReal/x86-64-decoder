@@ -501,13 +501,73 @@ static void bench_mt(const X86decDecoder* dec)
       (unsigned)thread_count);
 }
 
-int main(void)
+static const struct {
+  const char* code;
+  uint8_t len;
+} format_demo_cases[] = {
+  {"\x48\x89\xE5", 3},                             /* mov rbp, rsp */
+  {"\xB8\x34\x12\x00\x00", 5},                     /* mov eax, 0x1234 */
+  {"\x31\xC0", 2},                                 /* xor eax, eax */
+  {"\x8B\x44\x8B\x10", 4},                         /* mov eax, [rbx+rcx*4+0x10] */
+  {"\x48\x8B\x05\x00\x00\x00\x00", 7},             /* mov rax, [rip+0x0] */
+  {"\xF0\xFF\x00", 3},                             /* lock inc dword ptr [rax] */
+  {"\xE8\x00\x00\x00\x00", 5},                     /* call 0x0 */
+  {"\xEB\xFE", 2},                                 /* jmp -2 */
+  {"\x0F\xAF\xC1", 3},                             /* imul eax, ecx */
+  {"\x69\xC0\x05\x00\x00\x00", 6},                 /* imul eax, eax, 0x5 */
+  {"\x48\x0F\xCB", 3},                             /* bswap rbx */
+  {"\x66\x0F\x6F\xC0", 4},                         /* movdqa xmm0, xmm0 */
+  {"\xC4\xE1\x7C\x58\xC0", 5},                     /* vaddps ymm0, ymm0, ymm0 */
+  {"\xD8\xC1", 2},                                 /* fadd st0, st1 */
+  {"\xC3", 1},                                     /* ret */
+  {"\x90", 1},                                     /* nop */
+};
+
+static void format_demo(const X86decDecoder* dec)
+{
+  X86decInsn insn = {0};
+  X86decOperand ops[X86DEC_MAX_OPERANDS] = {0};
+  char bytes[48];
+  char text[160];
+  size_t i;
+
+  printf("format demo (bytes -> text):\n");
+
+  for (i = 0; i < sizeof(format_demo_cases) / sizeof(format_demo_cases[0]); i++) {
+    const char* code = format_demo_cases[i].code;
+    size_t len = format_demo_cases[i].len;
+    size_t pos = 0;
+    size_t j;
+
+    for (j = 0; j < len; j++) {
+      pos += (size_t)snprintf(bytes + pos, sizeof(bytes) - pos, "%02X",
+          (unsigned char)code[j]);
+    }
+
+    if (x86dec_decode_full(dec, code, len, &insn, ops,
+        X86DEC_MAX_OPERANDS) != X86DEC_OK ||
+        !x86dec_format_insn(&insn, ops, text, sizeof(text))) {
+      printf("%-22s -> <decode error>\n", bytes);
+      continue;
+    }
+
+    printf("%-22s -> %s\n", bytes, text);
+  }
+}
+
+int main(int argc, char** argv)
 {
   X86decDecoder dec64;
   X86decDecoder dec32;
   size_t total = sizeof(x86dec_vectors) / sizeof(x86dec_vectors[0]);
   size_t fails = 0;
   size_t i;
+  int demo = argc > 1 && strcmp(argv[1], "--format-demo") == 0;
+
+  if (argc > 1 && !demo) {
+    printf("usage: x86dec.exe [--format-demo]\n");
+    return 1;
+  }
 
   if (!x86dec_decoder_init(&dec64, X86DEC_MODE_LONG_64, X86DEC_STACK_64)) {
     printf("decoder init failed\n");
@@ -532,6 +592,12 @@ int main(void)
 
   printf("%u/%u vectors passed\n", (unsigned)(total - fails),
       (unsigned)total);
+
+  if (demo) {
+    format_demo(&dec64);
+    return fails ? 1 : 0;
+  }
+
   bench(&dec64);
   bench_insn_only(&dec64);
   bench_mt(&dec64);

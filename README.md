@@ -145,6 +145,23 @@ run the comparison:
 build\x86dec-bench-zydis.exe
 ```
 
+see what the formatter produces for representative encodings (registers, SIB memory, RIP-relative, lock prefix, branches, immediates, SSE/AVX, x87 stack):
+
+```cmd
+build\x86dec.exe --format-demo
+```
+
+```
+4889E5                 -> mov rbp, rsp
+8B448B10               -> mov eax, dword ptr ds:[rbx+rcx*4+0x10]
+488B0500000000         -> mov rax, qword ptr [rip+0x0]
+F0FF00                 -> lock inc dword ptr ds:[rax]
+C4E17C58C0             -> vaddps ymm0, ymm0, ymm0
+D8C1                   -> fadd st0, st1
+```
+
+formatting itself is covered by the test suite: every vector with expected text runs through `x86dec_format_insn` and is string-compared.
+
 minimal library usage:
 
 ```c
